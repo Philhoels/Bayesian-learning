@@ -21,6 +21,7 @@ library(gridExtra)
 library(latex2exp)
 #install.packages("HDInterval")
 library(HDInterval)
+library(coda)
 ```
 
 
@@ -294,13 +295,73 @@ ggplot(data = plot_data2.b, aes(x = G)) +
   geom_density(alpha=.2, fill="#FF6666") + 
   geom_vline(aes(xintercept = CI_095)) + 
   geom_vline(aes(xintercept = CI_0025))+
-  geom_text(aes(label ="97.5% interval", x =  CI_095 + 0.055, y = 7.5) )+
-  geom_text(aes(label ="2.5% interval", x =  CI_0025 +0.05, y = 7.5) )
+  geom_text(aes(label ="97.5 % interval", x =  CI_095 + 0.05, y = 7.5),size = 3 )+
+  geom_text(aes(label ="2.5 % interval", x =  CI_0025 -0.025, y = 7.5),size = 3 )
 
+```
+
+
+
+```{r}
 # Method 2:
 # Highest Posterior Density (HPD)
+
+# idea 1 - thinking problem it has to be h-line 
 density_G = density(G)
-higest_pd = max(dens_G$y)
+density_y = density_G$y
+density_x = density_G$x
+density_df = data.frame(density_x = density_x,
+                        density_y = density_y)
+density_y_sum = sum(density_y)
+density_y_max =max(density_y)
+density_y_max_index = which.max(density_y)
+density_y[density_y_max_index]/density_y_sum*100
+
+ci_95 = 91
+ci_volum_start = density_y[density_y_max_index]/density_y_sum*100 # volumen at the higest point
+ci_volum = ci_volum_start
+x_left = (density_y_max_index-1):1
+x_right = (density_y_max_index+1):length(density_y)
+x_left_point = (density_y_max_index-1)
+x_right_point = (density_y_max_index+1)
+x_left_volum = 0
+x_right_volum = 0
+while(ci_volum <= ci_95) {
+  # calculate the volumen to the left and the right
+  x_left_volum = density_y[x_left_point]/density_y_sum*100
+  x_right_volum = density_y[x_right_point]/density_y_sum*100
+  # move the point to the left and the right
+  x_left_point = x_left_point -1 # move to the left
+  x_right_point = x_right_point +1 # move to the right
+  # update the confidence interval 
+  ci_volum = ci_volum + x_left_volum + x_right_volum 
+}
+
+# idea 2 - h-line
+density_G = density(G)
+density_y = density_G$y
+density_x = density_G$x
+density_df = data.frame(nr = 1:length(density_x),
+                        density_x = density_x,
+                        density_y = density_y)
+density_df_ordered = density_df[order(density_y, decreasing = TRUE),]
+density_df_ordered$cumsum_y = cumsum(density_df_ordered$density_y)
+density_df_ordered$cumsum_y_proportional_percent = density_df_ordered$cumsum_y/sum(density_y)*100
+
+
+density_df_ordered$in_ci = density_df_ordered$cumsum_y_proportional_percent <= 95
+
+#data frame with just true values 
+density_df_ordered_trueci = density_df_ordered[(density_df_ordered$in_ci == TRUE),]
+HPD = density_df_ordered_trueci[nrow(density_df_ordered_trueci),]
+```
+
+```{r}
+ggplot(data = plot_data2.b, aes(x = G)) +
+  ggtitle("95% Highest Posterior Density interval for G") +
+  geom_density(alpha=.2, fill="#FF6666") + 
+  geom_hline(aes(yintercept = HPD$density_y)) +
+   geom_text(aes(label ="95% HPD interval", x =  0.45, y = HPD$density_y+0.2),size = 3 )
 ```
 
 
