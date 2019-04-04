@@ -224,6 +224,9 @@ theoreticle_mean = n_observations * tau_2/(n_observations-2)
 theoreticle_var = 2 * n_observations^2 * tau_2^2 /
   ((n_observations -2)^2 * (n_observations - 4))
 
+# --- exact values by LaplacesDemon
+xgrid <- seq(0.01,1,0.001)
+val <- LaplacesDemon::dinvchisq(xgrid, df=10, scale=tau_2)
 ```
 
 
@@ -231,7 +234,7 @@ theoreticle_var = 2 * n_observations^2 * tau_2^2 /
 
 ```{r }
 #-------------- Method 1: Theory from the lecture
-# --- simulate values from rchisq with formula in lecture 3
+# --- simulated values from rchisq with formula in lecture 3
 set.seed(12345)
 nDraws_2b = 10000
 computed_variance = c()
@@ -239,15 +242,12 @@ for (i in 1:nDraws_2b) {
   X = rchisq(1, n_observations)
   computed_variance[i] =  (n_observations) * tau_2 / X
 }
-
-# --- simulate values by LaplacesDemon
-val <- LaplacesDemon::rinvchisq(nDraws_2b,df=10,tau_2)
 ```
 
 
 
 ```{r echo=FALSE,warning=FALSE}
-data_2a = data.frame(computed_variance, val)
+data_2a = data.frame(computed_variance)
 
 p2a1=ggplot(data_2a,aes(x=computed_variance))+
  geom_histogram(aes(y=..density..),
@@ -255,27 +255,26 @@ p2a1=ggplot(data_2a,aes(x=computed_variance))+
                  fill="white",
                 bins = 30)+
   geom_density(alpha=.2, fill="#FF6666") + 
-  ggtitle(TeX("Histogram of $\\sigma^2$ from rchisq"))+
+  ggtitle(TeX("Histogram of $\\sigma^2$ from rchisq with formula in lecture 3"))+
   scale_x_continuous(limits = c(0,1))
 
-p2a2=ggplot(data_2a,aes(x=val))+
- geom_histogram(aes(y=..density..),
-                 colour="black",
-                 fill="white",
-                bins = 30)+
-  geom_density(alpha=.2, fill="#FF6666") + 
+data_2a = data.frame(xgrid,val)
+p2a2=ggplot(data_2a,aes(x=xgrid,y=val))+
+ geom_line()+
+  # geom_density(alpha=.2, fill="#FF6666") + 
   ggtitle(TeX("Histogram of $\\sigma^2$ by LaplacesDemon"))+
   scale_x_continuous(limits = c(0,1))
 
-grid.arrange(p2a1,p2a2, nrow = 2)
+grid.arrange(p2a2,p2a1, nrow = 2)
 
 ```
 
 ```{r, echo=FALSE}
 
-result_2a_data = data.frame("theoretical value" = c(theoreticle_mean,theoreticle_var),
-                            "simulated rchisq" = c(mean(computed_variance), var(computed_variance)),
-"simulated rinvchisq" = c(mean(val),var(val)))
+result_2a_data = data.frame(
+                            "theoretical value" = c(theoreticle_mean,theoreticle_var),
+                            "simulated invchisq" = c(mean(computed_variance), var(computed_variance))
+                            )
 
 rownames(result_2a_data) = c("mean", "variance")
 knitr::kable(t(result_2a_data))
