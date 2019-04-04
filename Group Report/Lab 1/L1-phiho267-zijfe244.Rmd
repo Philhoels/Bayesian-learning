@@ -23,6 +23,8 @@ library(latex2exp)
 #install.packages("HDInterval")
 library(HDInterval)
 library(coda)
+#install.packages("LaplacesDemon")
+library(LaplacesDemon)
 ```
 
 
@@ -145,6 +147,9 @@ nDraws_1c = 10000
 sample_1c = rbeta(n = nDraws_b, shape1 = 16, shape2 = 8)
 log_odds = log(sample_1c/(1-sample_1c))
 
+```
+
+```{r, echo=FALSE}
 # Visualization 
 # Histogram + Density
 
@@ -196,7 +201,8 @@ For this exercise did we decided to compare the simulated values with the theore
 
 We calculate the mean and variance of the scaled inverse chi-squared distribution distribution as follows:
 
-$$E(\theta)  = \frac{n \tau^2}{n-2}\ for\ n>2,  \\ Var[\theta] = \frac{2n^2\tau^4}{(n-2)^2(n-4)}\ for\ n>4$$
+$$E(\theta)  = \frac{n \tau^2}{n-2}\ for\ n>2$$
+$$ Var[\theta] = \frac{2n^2\tau^4}{(n-2)^2(n-4)}\ for\ n>4$$
 
 - *True mean and variance*
 
@@ -224,6 +230,7 @@ theoreticle_var = 2 * n_observations^2 * tau_2^2 /
 - *Simulated mean and variance*
 
 ```{r }
+#-------------- Method 1: Theory from the lecture
 # --- simulate values from rchisq with formula in lecture 3
 set.seed(12345)
 nDraws_2b = 10000
@@ -235,8 +242,9 @@ for (i in 1:nDraws_2b) {
 
 # --- simulate values by LaplacesDemon
 val <- LaplacesDemon::rinvchisq(nDraws_2b,df=10,tau_2)
-
 ```
+
+
 
 ```{r echo=FALSE,warning=FALSE}
 data_2a = data.frame(computed_variance, val)
@@ -247,7 +255,7 @@ p2a1=ggplot(data_2a,aes(x=computed_variance))+
                  fill="white",
                 bins = 30)+
   geom_density(alpha=.2, fill="#FF6666") + 
-  ggtitle("Histogram of sigma^2 from rchisq")+
+  ggtitle(TeX("Histogram of $\\sigma^2$ from rchisq"))+
   scale_x_continuous(limits = c(0,1))
 
 p2a2=ggplot(data_2a,aes(x=val))+
@@ -256,10 +264,11 @@ p2a2=ggplot(data_2a,aes(x=val))+
                  fill="white",
                 bins = 30)+
   geom_density(alpha=.2, fill="#FF6666") + 
-  ggtitle("Histogram of sigma^2 by LaplacesDemon")+
+  ggtitle(TeX("Histogram of $\\sigma^2$ by LaplacesDemon"))+
   scale_x_continuous(limits = c(0,1))
 
 grid.arrange(p2a1,p2a2, nrow = 2)
+
 ```
 
 ```{r, echo=FALSE}
@@ -308,6 +317,8 @@ The most part of the distribution of Gini coefficient is located around [0.12, 0
 ## (c) tail credible interval for G 
 Use the posterior draws from b) to compute a 95% equal tail credible interval for G. An 95% equal tail interval (a, b) cuts off 2.5% percent of the posterior probability mass to the left of a, and 97.5% to the right of b. Also, do a kernel density estimate of the posterior of G using the density function in R with default settings, and use that kernel density estimate to compute a 95% Highest Posterior Density interval for G. Compare the two intervals.
 
+- 95% Credible Interval
+
 ```{r}
 # Method 1:
 # calculate the 95% credible(confidence) interval
@@ -316,6 +327,16 @@ b = 0.975
 CI_0025 = quantile(G, probs = c(a,b))[1]
 CI_095 = quantile(G, probs = c(a,b))[2]
 
+```
+
+```{r, echo=FALSE}
+# create plot data 
+
+########### test
+#plot_data2.c = plot_data2.b
+#plot_data2.c$ci095 = ifelse(G <= CI_0025 | G >= CI_095, TRUE, FALSE) # binary if G - value is in confidence interval or not 
+########### test
+
 # plot density
 ggplot(data = plot_data2.b, aes(x = G)) +
   ggtitle("95% credible interval of G") +
@@ -323,15 +344,20 @@ ggplot(data = plot_data2.b, aes(x = G)) +
   geom_vline(aes(xintercept = CI_095)) + 
   geom_vline(aes(xintercept = CI_0025))+
   geom_text(aes(label ="97.5 % interval", x =  CI_095 + 0.05, y = 7.5),size = 3 )+
-  geom_text(aes(label ="2.5 % interval", x =  CI_0025 -0.025, y = 7.5),size = 3 )
-
+  geom_text(aes(label ="2.5 % interval", x =  CI_0025 -0.025, y = 7.5),size = 3 ) +
+  xlab("x")
 ```
 
 
+The x values of G are `r CI_0025` and `r CI_095`.
 
-```{r}
-# Method 2:
+
+```{r, echo=FALSE, eval=FALSE}
 # Highest Posterior Density (HPD)
+
+#-----------------------------------------------
+#This thinking is not correct - take a value from the left & right with max value of function as highest point 
+#-----------------------------------------------
 
 # idea 1 - thinking problem it has to be h-line 
 density_G = density(G)
@@ -363,7 +389,12 @@ while(ci_volum <= ci_95) {
   # update the confidence interval 
   ci_volum = ci_volum + x_left_volum + x_right_volum 
 }
+```
 
+- 95% Highest Posterior Density interval
+
+```{r}
+# Method 2:
 # idea 2 - h-line
 density_G = density(G)
 density_y = density_G$y
@@ -381,19 +412,44 @@ density_df_ordered$in_ci = density_df_ordered$cumsum_y_proportional_percent <= 9
 #data frame with just true values 
 density_df_ordered_trueci = density_df_ordered[(density_df_ordered$in_ci == TRUE),]
 HPD = density_df_ordered_trueci[nrow(density_df_ordered_trueci),]
+
+
+# calculate the x values  wiht hdi
+x_vals = hdi(G)
 ```
 
-```{r}
-x_vals = hdi(G)
+```{r, echo=FALSE, eval=FALSE}
+# library(dplyr)
+# library(ggplot2)
+# 
+# dens <- density(G)
+# 
+# data <- tibble(x = dens$x, y = dens$y) %>% 
+#   mutate(variable = case_when(
+#     (x >= interval[1] & x <= interval[2]) ~ "On",
+#     ( x<=interval[1]) ~ "Off",(x >=interval[2])~"onOff",
+#     TRUE ~ NA_character_))
+# #> Warning: package 'bindrcpp' was built under R version 3.4.4
+# 
+# ggplot(data, aes(x, y)) + geom_line(size=2) +
+#   geom_area(data = filter(data, variable == 'On'), fill = 'lightslateblue') + 
+#   geom_area(data = filter(data, variable == 'Off'), fill = 'orange')+
+#   geom_area(data = filter(data, variable == 'onOff'), fill = 'orange')
+```
 
+
+```{r, echo=FALSE}
 ggplot(data = plot_data2.b, aes(x = G)) +
   ggtitle("95% Highest Posterior Density interval for G") +
   geom_density(alpha=.2, fill="#FF6666") + 
   geom_vline(aes(xintercept = x_vals[1])) +
   geom_vline(aes(xintercept = x_vals[2])) +
   geom_hline(aes(yintercept = HPD$density_y)) +
-   geom_text(aes(label ="95% HPD interval", x =  0.45, y = HPD$density_y+0.2),size = 3 )
+  geom_text(aes(label ="95% HPD interval", x =  0.45, y = HPD$density_y+0.2),size = 3 ) + 
+  xlab("x")
 ```
+
+The x values of G are `r x_vals[1]` and `r x_vals[2]`.
 
 
 
@@ -493,9 +549,136 @@ k_max_index = which.max(result_3a)
 
 plot_3a + geom_vline(aes(xintercept = k[k_max_index]))
 
-cat("posterior mode :",k[k_max_index])
+#cat("posterior mode :",k[k_max_index])
 
 ```
+
+The mode has the $\kappa$ value of `r k[k_max_index]`.
+
+
+```{r,echo=FALSE, eval=FALSE}
+NormalNonInfoPrior<-function(NDraws,Data){
+
+#####################################################################################
+# PURPOSE: 	Generates samples from the joint posterior distribution of the parameters in the
+#
+#		MODEL: x1,....xn iid Normal(mu,sigma^2) model. 
+#		PRIOR: p(mu,sigma^2) propto 1/sigma^2				
+#
+#
+# INPUT:	NDraw: 		(Scalar)	The number of posterior draws
+#		Data:		(n-by-1)	Data vector of n observations
+#				
+# OUTPUT:	PostDraws:	(NDraws-by-2)	Matrix of posterior draws. 
+#						First column holds draws of mu		
+#						Second column holds draws of sigma^2
+#
+# AUTHOR:	Mattias Villani, Sveriges Riksbank and Stockholm University.
+#		E-mail: mattias.villani@riksbank.se.
+#
+# DATE:		2005-04-13
+#
+######################################################################################
+
+
+Datamean<-mean(Data)
+s2<-var(Data)
+n<-length(Data)
+PostDraws=matrix(0,NDraws,2)
+PostDraws[,2]<-((n-1)*s2)/rchisq(NDraws,n-1)
+PostDraws[,1]<-Datamean+rnorm(NDraws,0,1)*sqrt(PostDraws[,2]/n)
+
+return(PostDraws)
+}
+
+Data<-rnorm(100,5,10) 			# Sampling 100 observations from the N(5,10) density##
+PostDraws<-NormalNonInfoPrior(1000,Data) # Generating 1000 draws from the joint posterior density of mu and sigma^2
+hist(PostDraws[,1]) 			# Plotting the histogram of mu-draws
+
+#################################################################################################
+#################  Example of conjugate prior inference of the multinomial model ################ 
+#################################################################################################
+ 
+####### Defining a function that simulates from a Dirichlet distribution
+SimDirichlet <- function(nIter,param){
+	nCat <- length(param)
+	thetaDraws <- matrix(0,nIter,nCat) # Matrix where the posterior draws are stored
+	for (j in 1:nCat){
+		thetaDraws[,j] <- rgamma(nIter,param[j],1)
+	}
+	for (i in 1:nIter){
+		thetaDraws[i,] = thetaDraws[i,]/sum(thetaDraws[i,]) # Diving every column of ThetaDraws by the sum of the elements in that column.
+	}
+	return(thetaDraws)
+}
+
+###########   Setting up data and prior  #################
+y <- c(36,87,77) # Data
+alpha <- c(1,1,1) # Dirichlet prior hyperparameters
+nIter <- 10000 # Number of posterior draws
+
+###########   Posterior sampling from Dirichlet  #################
+thetaDraws <- SimDirichlet(nIter,y + alpha)
+
+################ Computing Summary statistics from the posterior sample ###################
+mean(thetaDraws[,1])
+mean(thetaDraws[,2])
+mean(thetaDraws[,3])
+
+sqrt(var(thetaDraws[,1]))
+sqrt(var(thetaDraws[,2]))
+sqrt(var(thetaDraws[,3]))
+
+sum(thetaDraws[,2]>thetaDraws[,3])/nIter # p(theta2>theta3|Data)
+
+# Plots histograms of the posterior draws
+plot.new() # Opens a new graphical window
+par(mfrow = c(2,2)) # Splits the graphical window in four parts (2-by-2 structure)
+hist(thetaDraws[,1],25) # Plots the histogram of theta[,1] in the upper left subgraph
+hist(thetaDraws[,2],25)
+hist(thetaDraws[,3],25)
+
+
+PostAndPredIIDNormalNonInfoPrior<-function(Sample,PopStd,Niter){
+
+########################################################################################
+#
+# PURPOSE:	Sample from posterior and predictive distribution in the normal iid model
+# 		with a non-informative (flat) prior. Population standard deviation is known.
+#
+# INPUT:	Sample	(n-by-1)	Vector with sample observations
+#		PopStd	(scalar)	Standard deviation in the population
+#		Niter   (scalar)	Number of draws from posterior and predictive distributions.
+#
+# OUTPUT:	(Niter-by-2) 		Matrix of draws. From posterior in first column. 
+#					From predictive distribution in second column.
+#
+# AUTHOR:	Mattias Villani, Sveriges Riksbank and Stockholm University. 
+#         	E-mail: mattias.villani@riksbank.se
+#
+# FIRST VER.:	2007-02-04
+# THIS VER.:    2007-02-04 
+#
+##########################################################################################
+
+# Initialization
+PostSampleTheta=matrix(0,Niter,1)
+PredSampleYtilde=matrix(0,Niter,1)
+
+# Initial computations
+n<-length(Sample)
+SampleMean<-mean(Sample)                                     # ybar
+SampleStd<-PopStd/sqrt(n)                                    # Sigma/sqrt(n)
+
+for (i in 1:Niter){
+  PostSampleTheta[i]=SampleMean+rnorm(1,0,1)*SampleStd       # Theta~N[ybar,Sigma/sqrt(n)]
+  PredSampleYtilde[i]=PostSampleTheta[i]+rnorm(1,0,1)*PopStd # yhat~N(Theta,Sigma)
+}
+
+return(cbind(PostSampleTheta,PredSampleYtilde))
+}
+```
+
 
 
 \newpage
