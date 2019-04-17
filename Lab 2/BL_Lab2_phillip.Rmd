@@ -1,0 +1,196 @@
+---
+title: "Computer Lab 2"
+author: "Phillip H??lscher"
+date: "9 4 2019"
+output: 
+  pdf_document:
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+
+```{r, echo=FALSE}
+# packages we use in the lab
+library(mvtnorm)
+library(LaplacesDemon)
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# clean environment
+rm(list=ls())
+```
+
+
+#1. Linear and polynomial regression
+The dataset *TempLinkoping.txt* contains daily temperatures (in Celcius degrees) at Malmsl??tt, Link??ping over the course of the year 2016 (366 days since 2016 was a leap year). The response variable is temp and the covariate is
+
+$$ \ time = \frac{\ the \ number \ of \ days \ since \ beginning \ of \ year}{366}  $$
+The task is to perform a Bayesian analysis of a quadratic regression
+
+$$ \ temp = \beta_0 + \beta_1 \cdot \ time + \beta_2 \cdot \ time^2 + \varepsilon \overset{\text{iid}}{\sim} \mathcal{N}(0,\sigma^2)$$
+
+##(a) Determining the prior distribution of the model parameters. 
+Use the conjugate prior for the linear regression model. Your task is to set the prior hyperparameters $\mu_0, \Omega_0, \upsilon_0$ and $\sigma^2_0 = 1$ to sensible values. Start with $\mu_0 = -10, 100, -100)^T$ ,$\Omega_0 =0.01 \cdot I_3, , \upsilon_0 = 4, \sigma^2_0 = 1$. Check if this prior agrees with your prior opinions by simulating draws from the joint prior of all parameters and for every draw compute the regression curve. This gives a collection of regression curves, one for each draw from the prior. Do the collection of curves look reasonable? If not, change the prior hyperparameters until the collection of prior regression curves do agree with your prior beliefs about the regression curve. [Hint: the R package *mvtnorm* will be handy. And use your $Inv - \chi^2$
+simulator from Lab 1.]
+
+
+```{r, echo=FALSE}
+# load the data
+tempdata = read.delim("TempLinkoping.txt", sep = "\t")
+
+# given values
+mu_0 = t(c(-10,100,-100))
+omega_0 = 0.01 * diag(3)
+v_0 = 4
+sigma2_0 = 1
+```
+
+```{r}
+# linear model - without beta
+lmTemp = lm( temp ~ time + I(time^2), 
+             data = tempdata)
+summary(lmTemp)
+
+# create data - which 
+temp_model_data = data.frame(y = tempdata$temp,
+                          x =tempdata$time,
+                          x_power2 = tempdata$time^2)
+
+# plot the data
+plot_1a = ggplot(temp_model_data, aes(x = x, y=y)) +
+  geom_point(color = "blue") +
+  ylab("Temperature") + xlab("Time")
+plot_1a
+```
+
+```{r}
+# create simulation
+
+set.seed(123456)
+# joint conjugate prior
+prior <- data.frame(matrix(ncol=3,nrow=100))
+for (i in 1:100) {
+  var = LaplacesDemon::rinvchisq(1,v_0,sigma2_0)
+  beta = MASS::mvrnorm(1, mu_0, var*solve(omega_0))
+  prior[i,1:3] = beta
+}
+
+n = 100 # nr of simulations
+# data frame to save prior coef data
+prior = data.frame("coef0" = numeric(),
+                   "coef1" = numeric(),
+                   "coef2" = numeric())
+# data frame to save linear regression line
+regline = data.frame(matrix(nrow = 366, ncol = 100))
+#regline = data.frame()
+
+set.seed(123456)
+for (i in 1:n) {
+  sigma2 = rinvchisq(1, df = v_0, sigma2_0) # lecture 5 slide 7 - Inv - chi^2(v_0,sigma^2_0)
+  beta = rmvnorm(n = 1, mean = mu_0, sigma = sigma2 * solve(omega_0)) # solve(A)	Inverse of A where A is a square matrix.
+  prior = rbind(prior,beta)
+  regline[,i] = beta[1] + beta[2] * temp_model_data$x + beta[3] * temp_model_data$x_power2
+  #regline = cbind(regline,regline[i])
+}
+
+```
+
+```{r}
+
+temp_model_data$pred1 = c(regline[,1])
+
+
+plot_1a + geom_line(x = temp_model_data$x, y= as.data.frame(temp_model_data$pred1))
+
+
+tempdata_new$x[1]
+beta%*%t(tempdata_new$x)
+
+plot_1a + geom_line()
+```
+
+
+
+```{r}
+
+
+```
+
+
+##(b) Write a program that simulates from the joint posterior distribution 
+of $\beta_0, \beta_1, \beta_2$ and $\sigma^2$. Plot the marginal posteriors for each parameter as a histogram. Also produce another figure with a scatter plot of the temperature data and overlay a curve for the posterior median of the regression function $f(\ time) = \beta_0 + \beta_1 \cdot \ time, \beta_2 \cdot \ time^2$, computed for every value of *time*. Also overlay curves for the lower 2.5% and upper 97.5% posterior credible interval for $f(\ time)$. That is, compute the 95% equal tail posterior probability intervals for every value of time and then connect the lower and upper limits of the interval by curves. Does the interval bands contain most of the data points? Should they?
+
+
+##(c) Locate the time with the highest expected temperature
+It is of interest to locate the *time* with the highest expected temperature (that is, the time where $f(\ time)$ is maximal). Let??s call this value $\widetilde{x}$. Use the simulations in b) to simulate from the posterior distribution of $\widetilde{x}$.
+[Hint: the regression curve is a quadratic. You can find a simple formula for $\widetilde{x}$ given $\beta_0, \beta_1$ and $\beta_2$.]
+
+
+##(d) Polynomial model of order 7
+Say now that you want to *estimate a polynomial model of order 7*, but you suspect that higher order terms may not be needed, and you worry about overfitting. Suggest a suitable prior that mitigates this potential problem. You do not need to compute the posterior, just write down your prior. [Hint: the task is to specify $\mu_0$ and $\Omega_0$ in a smart way.]
+
+\newpage
+
+```{r}
+# clean up environment
+rm(list=ls())
+```
+#2. Posterior approximation for classification with logistic regression
+The dataset **WomenWork.dat** contains *n* = 200 observations (i.e. women) on the following nine variables:
+
+```{r, echo=FALSE, out.width="350px", out.height="300px", fig.align = "center"}
+knitr::include_graphics("lab2_table_ex2.png")
+```
+
+
+
+##(a) Consider the logistic regression
+
+$$\ Pr(y = 1\mid \boldsymbol x) = \frac{\exp(\boldsymbol x^T\beta)}{1+\exp(\boldsymbol x^T\beta)}$$
+
+where $y$ is the binary variable with $y=1$ if the woman works and  $y=0$ if she does not. $\boldsymbol x$ is a 8-dimensional vector containing the eight features (including a one for the constant term that models the intercept). Fit the logistic regression using maximum likelihood estimation by the command: **glmModel <- glm(Work** $\boldsymbol \sim$ **0 + ., data = WomenWork, family = binomial)**. Note how I added a zero in the model formula so that R doesn???t add an extra intercept (we already have an intercept term from the *Constant* feature). Note also that a dot (.) in the model formula means to add all other variables in the dataset as features. *family = binomial* tells R that we want to fit a logistic regression.
+
+```{r}
+# load the data & define y (response) and x 8 dimensional vector of the features
+womenwork = read.table("WomenWork.dat", header = TRUE)
+y = womenwork$Work
+x = womenwork[,2:9]
+
+```
+
+
+```{r}
+# logistic regression
+glmModel = glm(y ~ 0. ,
+               data = womenwork,
+               family = "binomial")
+```
+
+
+
+##(b) Now the fun begins. 
+Our goal is to approximate the posterior distribution of the 8-dim parameter vector $\beta$ with a multivariate normal distribution
+
+$$ \beta \mid \boldsymbol y, \boldsymbol X \sim  \mathcal{N} \big( \widetilde{\beta}, J^{-1}_{\boldsymbol y}(\widetilde{\beta})  \big)$$
+
+where $\widetilde{\beta}$ is the posterior mode and $J(\widetilde{\beta}) = \frac{\partial^2 \ ln\ p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T} \mid_{\beta = \tilde{\beta}}$ is the observed Hessian evaluated at the posterior mode. Note that $\frac{\partial^2 \ ln p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T}$ is an 8 $\times$ 8 matrix with second derivatives on the diagonal and cross-derivatives $\frac{\partial^2 \ ln p( \beta \mid \boldsymbol y)}{\partial \beta_i \partial \beta_j}$  on the offdiagonal. It is actually not hard to compute this derivative by hand, but don???t worry, we will let the computer do it numerically for you. Now, both $\tilde{\beta}$ and $J(\tilde{\beta})$ are computed by the optim function in R. See my code ** https://github.com/ mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam. ** **zip** where I have coded everything up for the spam prediction example (it also does probit regression, but that is not needed here). I want you to implement you own version of this. You can use my code as a template, but I want you
+to write your own file so that you understand every line of your code. Don???t just copy my code. Use the prior $\beta \sim \mathcal{N}(0, \tau^2 I)$, with $\tau = 10$. 
+Your report should include your code as well as numerical values for $\tilde{\beta}$ and $J^{-1}_{\boldsymbol y}(\tilde{\beta})$ for *Womanwork* data. Compute an approximate 95% credible interval for the variable NSmallChild. Would you say that this feature is an important determinant of the probability that a women works?
+
+
+##(c) Simulates from the predictive distribution
+Write a function that simulates from the predictive distribution of the response variable in a logistic regression. Use your normal approximation from 2(b). Use that function to simulate and plot the predictive distribution for the *Work* variable for a 40 year old woman, with two children (3 and 9 years old), 8 years of education, 10 years of experience. and a husband with an income of 10. [Hint: the R package *mvtnorm* will again be handy. And remember my discussion on how Bayesian prediction can be done by simulation.]
+
+
+
+\newpage
+# Appendix
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+```
+
