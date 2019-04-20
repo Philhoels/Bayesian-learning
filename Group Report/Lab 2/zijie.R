@@ -105,7 +105,11 @@ ggplot(data13)+
   geom_line(aes(x=time, y=upper),color="Red",linetype="dashed",size=1)+
   geom_line(aes(x=time,y=pred_highest),color="Cyan",size=1)
 
-  #1.4############################################################################
+#1.4############################################################################
+
+# Smoothness/shrinkage/regularization prior
+
+
 
 
 
