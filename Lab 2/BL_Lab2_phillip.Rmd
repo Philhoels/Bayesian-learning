@@ -17,7 +17,9 @@ knitr::opts_chunk$set(echo = TRUE)
 # packages we use in the lab
 library(mvtnorm)
 library(LaplacesDemon)
-
+library(gridExtra)
+# install.packages("randomcoloR")
+library(randomcoloR)
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -41,89 +43,253 @@ simulator from Lab 1.]
 
 ```{r, echo=FALSE}
 # load the data
-tempdata = read.delim("TempLinkoping.txt", sep = "\t")
+tempdata <- read.delim("TempLinkoping.txt", sep = "\t")
 
-# given values
-mu_0 = t(c(-10,100,-100))
-omega_0 = 0.01 * diag(3)
-v_0 = 4
-sigma2_0 = 1
+y <- tempdata$temp # response variable
+X <- cbind(tempdata$time, tempdata$time^2) # predictor variables - given from the model
+
+# prior hyperparameters - given values
+mu_0 <- t(c(-10,100,-100))
+omega_0 <- 0.01 * diag(3)
+v_0 <- 4
+sigma2_0 <- 1
 ```
 
 ```{r}
 # linear model - without beta
-lmTemp = lm( temp ~ time + I(time^2), 
+lmTemp <- lm(temp ~ time + I(time^2), 
              data = tempdata)
+```
+
+```{r, echo=FALSE}
+lmTemp
+```
+
+```{r, echo=FALSE}
 summary(lmTemp)
+```
 
-# create data - which 
-temp_model_data = data.frame(y = tempdata$temp,
-                          x =tempdata$time,
-                          x_power2 = tempdata$time^2)
 
-# plot the data
-plot_1a = ggplot(temp_model_data, aes(x = x, y=y)) +
-  geom_point(color = "blue") +
+
+```{r, echo=FALSE}
+# create plot data 
+temp_model_data <- data.frame(y = tempdata$temp,
+                              x =tempdata$time,
+                              x_power2 = tempdata$time^2)
+
+# crate scatter plot of time and the temperature
+plot_1a <- ggplot(temp_model_data, aes(x = x, y=y)) +
+  geom_point(color = "#00BFC4") +                     # default blue
   ylab("Temperature") + xlab("Time")
 plot_1a
 ```
 
+
 ```{r}
 # create simulation
-
 set.seed(123456)
-# joint conjugate prior
-prior <- data.frame(matrix(ncol=3,nrow=100))
-for (i in 1:100) {
-  var = LaplacesDemon::rinvchisq(1,v_0,sigma2_0)
-  beta = MASS::mvrnorm(1, mu_0, var*solve(omega_0))
-  prior[i,1:3] = beta
+
+# number of simulations
+N = 100
+
+joint_conjugate_prior <- function(nr_of_iterations, v_0, sigma2_0, mu_0, omega_0){
+  # Linear regression - conjugate prior - lecture 5 slide 7
+  # Simulates joint prior for beta and sigma
+  #
+  # Args:
+  #   nr_of_iterations
+  #   v_0
+  #   sigma2_0
+  #   mu_0
+  #   omega_0
+  #
+  # Returns:
+  #   - A data frame of the prior with the simulated beta values
+  #   - A data frame of all simulated regression lines
+  
+  # data frame to save prior coef data
+  prior <- data.frame(matrix(ncol = 3, nrow = nr_of_iterations)) # for every beta one column
+
+  # data frame to save linear regression line
+  regline <- data.frame(matrix(nrow = 366, ncol = nr_of_iterations)) # for every day one column
+  
+  # joint conjugate prior
+  for (i in 1:nr_of_iterations) {
+  
+  #  - chi^2(v_0,sigma^2_0)
+  var <- LaplacesDemon::rinvchisq(1,v_0,sigma2_0)
+  
+  # beta|var - N(mu_o, sigma^2 * omega^{-1}_0)
+  # solve(A)	Inverse of A where A is a square matrix
+  beta <- MASS::mvrnorm(1, mu_0, var*solve(omega_0))
+  
+  # fill prior and regression line data frames with data
+  prior[i,1:3] <- beta
+  regline[,i] <- beta[1] + beta[2] * temp_model_data$x + beta[3] * temp_model_data$x_power2
+  }
+  
+  
+  # add meaningful column and row names
+  for (i in 1:nr_of_iterations) {
+  colnames(regline)[i] <- paste0("pred", i)
+  rownames(regline)[i] <- paste0("day",i)
+  }
+  
+  #return(prior, regline)
+  # return: the two data frames in the gloable environment
+  prior <<- prior
+  regline <<- regline
 }
 
-n = 100 # nr of simulations
+joint_conjugate_prior(N, v_0, sigma2_0, mu_0, omega_0)
+
+```
+
+```{r, echo=FALSE, eval=FALSE}
+# code I used to create the function
+
+# nr of simulations
+n <- 100 
+nr_of_iterations = 100
+
 # data frame to save prior coef data
-prior = data.frame("coef0" = numeric(),
-                   "coef1" = numeric(),
-                   "coef2" = numeric())
-# data frame to save linear regression line
-regline = data.frame(matrix(nrow = 366, ncol = 100))
-#regline = data.frame()
+prior <- data.frame(matrix(ncol=3,nrow=n))
 
-set.seed(123456)
+# data frame to save linear regression line
+regline <- data.frame(matrix(nrow = 366, ncol = n))
+
+# joint conjugate prior
 for (i in 1:n) {
-  sigma2 = rinvchisq(1, df = v_0, sigma2_0) # lecture 5 slide 7 - Inv - chi^2(v_0,sigma^2_0)
-  beta = rmvnorm(n = 1, mean = mu_0, sigma = sigma2 * solve(omega_0)) # solve(A)	Inverse of A where A is a square matrix.
-  prior = rbind(prior,beta)
-  regline[,i] = beta[1] + beta[2] * temp_model_data$x + beta[3] * temp_model_data$x_power2
-  #regline = cbind(regline,regline[i])
+  
+  # lecture 5 slide 7 - Inv - chi^2(v_0,sigma^2_0)
+  var <- LaplacesDemon::rinvchisq(1,v_0,sigma2_0)
+  
+  # lecture 5 slide 7 - beta|var - N(mu_o, sigma^2 * omega^{-1}_0)
+  # solve(A)	Inverse of A where A is a square matrix
+  beta <- MASS::mvrnorm(1, mu_0, var*solve(omega_0))
+  
+  # fill prior and regression line data frames with data
+  prior[i,1:3] <- beta
+  regline[,i] <- beta[1] + beta[2] * temp_model_data$x + beta[3] * temp_model_data$x_power2
 }
 
-```
 
-```{r}
-
-temp_model_data$pred1 = c(regline[,1])
-
-
-plot_1a + geom_line(x = temp_model_data$x, y= as.data.frame(temp_model_data$pred1))
-
-
-tempdata_new$x[1]
-beta%*%t(tempdata_new$x)
-
-plot_1a + geom_line()
+# add meaningful column and row names
+for (i in 1:n) {
+  colnames(regline)[i] <- paste0("pred", i)
+  rownames(regline)[i] <- paste0("day",i)
+}
 ```
 
 
+```{r, echo=FALSE}
+
+# add regression lines to plot_1a & save as new plot
+plot_1a_lines <- plot_1a
+for (i in 1:N) {
+  plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,i]), 
+                                             col = randomColor(1))
+}
+plot_1a_lines
+
+# Problem:
+# It looks like only one line will be produced more than once.
+# ---------------------- Test
+#plot_1a_lines <- plot_1a
+plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,1]), col = randomColor(1))
+plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,2]), col = randomColor(1))
+plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,3]), col = randomColor(1))
+plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,50]), col = randomColor(1))
+plot_1a_lines <- plot_1a_lines + geom_line(aes(x = tempdata$time, y = regline[,90]), col = randomColor(1))
+plot_1a_lines
+# ---------------------- Test
+# Here we see that when lines are added individually, they are different from the for loops.
+
+```
+
+It can be seen that the predictions are very different and do not correspond to the true data. 
+Accordingly, the prior hyperparameters should be changed.
+
 
 ```{r}
+# changed hyperparameters
 
+# comment to the mu_0_new values:
+# coefficients of lmTemp
+mu_0_new <- t(c(-10.68, 93.60, -85.83))
+omega_0_new <- 0.01 * diag(3)
+v_0_new <- 4
+# comment to the sigma2_0 value: 
+# in the picture above can we see the preditions differ widely, therefor the varaiance wil bereduced  
+sigma2_0_new <- 0.5 
+
+# run new simulation
+joint_conjugate_prior(N, v_0_new, sigma2_0_new, mu_0_new, omega_0_new)
+
+
+```
+
+
+```{r}
+# add regression lines to plot_1a & save as new plot
+plot_1a_lines_new <- plot_1a
+for (i in 1:N) {
+  plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,i]), 
+                                             col = randomColor(1))
+}
+plot_1a_lines_new
+
+# Problem:
+# It looks like only one line will be produced more than once.
+# ---------------------- Test
+#plot_1a_lines <- plot_1a
+plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,1]), col = randomColor(1))
+plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,2]), col = randomColor(1))
+plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,3]), col = randomColor(1))
+plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,50]), col = randomColor(1))
+plot_1a_lines_new <- plot_1a_lines_new + geom_line(aes(x = tempdata$time, y = regline[,90]), col = randomColor(1))
+plot_1a_lines_new
+# ---------------------- Test
+# Here we see that when lines are added individually, they are different from the for loops.
+
+```
+
+```{r}
+# combine the two plots
+library(gridExtra)
+
+grid.arrange(plot_1a_lines, plot_1a_lines_new)
 
 ```
 
 
 ##(b) Write a program that simulates from the joint posterior distribution 
 of $\beta_0, \beta_1, \beta_2$ and $\sigma^2$. Plot the marginal posteriors for each parameter as a histogram. Also produce another figure with a scatter plot of the temperature data and overlay a curve for the posterior median of the regression function $f(\ time) = \beta_0 + \beta_1 \cdot \ time, \beta_2 \cdot \ time^2$, computed for every value of *time*. Also overlay curves for the lower 2.5% and upper 97.5% posterior credible interval for $f(\ time)$. That is, compute the 95% equal tail posterior probability intervals for every value of time and then connect the lower and upper limits of the interval by curves. Does the interval bands contain most of the data points? Should they?
+
+
+```{r}
+# ------------------------- Lecture 5 - Slide 6 & 7
+# we use X and y from the previous exercise 
+
+# Normal model with normal prior L5 S3
+k <- 3 #  nr of regression coefficients
+
+# Marginal posterior - theta | y ~ t_vn(mu_n, var^2_n / k_n)
+
+
+# Linear regression - uniform prior - joint posterior L5 S6
+beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
+
+# Linear regression - conjugate prior - posterior L5 S7
+mu_n <- solve(t(X) %*% X + omega_0) %*% (t(X) %*% X %*% beta_hat + omega_0 %*% mu_0)
+omega_n <- t(X) %*% X+omega_0
+v_n <- v_0 + n
+v_n_sigma2_n <- (v_0 * sigma2_0 + (t(y) %*% y + t(mu_0) %*% omega_0 %*% mu_0 - t(mu_n) %*% omega_n %*% mu_n)) / v_n
+
+
+```
+
+
 
 
 ##(c) Locate the time with the highest expected temperature
@@ -157,17 +323,17 @@ where $y$ is the binary variable with $y=1$ if the woman works and  $y=0$ if she
 
 ```{r}
 # load the data & define y (response) and x 8 dimensional vector of the features
-womenwork = read.table("WomenWork.dat", header = TRUE)
-y = womenwork$Work
-X = womenwork[,2:9]
-X = as.matrix(X)
-n = nrow(womenwork) # nr of observations
+womenwork <- read.table("WomenWork.dat", header = TRUE)
+y <- womenwork$Work
+X <- womenwork[,2:9]
+X <- as.matrix(X)
+n <- nrow(womenwork) # nr of observations
 ```
 
 
 ```{r}
 # logistic regression
-glmModel = glm(y ~ 0. ,
+glmModel <- glm(y ~ 0. ,
                data = womenwork,
                family = "binomial")
 
@@ -186,73 +352,6 @@ $$ \beta \mid \boldsymbol y, \boldsymbol X \sim  \mathcal{N} \big( \widetilde{\b
 where $\widetilde{\beta}$ is the posterior mode and $J(\widetilde{\beta}) = \frac{\partial^2 \ ln\ p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T} \mid_{\beta = \tilde{\beta}}$ is the observed Hessian evaluated at the posterior mode. Note that $\frac{\partial^2 \ ln p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T}$ is an 8 $\times$ 8 matrix with second derivatives on the diagonal and cross-derivatives $\frac{\partial^2 \ ln p( \beta \mid \boldsymbol y)}{\partial \beta_i \partial \beta_j}$  on the offdiagonal. It is actually not hard to compute this derivative by hand, but don???t worry, we will let the computer do it numerically for you. Now, both $\tilde{\beta}$ and $J(\tilde{\beta})$ are computed by the optim function in R. See my code ** https://github.com/ mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam. ** **zip** where I have coded everything up for the spam prediction example (it also does probit regression, but that is not needed here). I want you to implement you own version of this. You can use my code as a template, but I want you
 to write your own file so that you understand every line of your code. Don???t just copy my code. Use the prior $\beta \sim \mathcal{N}(0, \tau^2 I)$, with $\tau = 10$. 
 Your report should include your code as well as numerical values for $\tilde{\beta}$ and $J^{-1}_{\boldsymbol y}(\tilde{\beta})$ for *Womanwork* data. Compute an approximate 95% credible interval for the variable NSmallChild. Would you say that this feature is an important determinant of the probability that a women works?
-
-```{r}
-# given values for the prior 
-mu = 0
-tau = 10  # Prior scaling factor such that Prior Covariance = (tau^2)*I - need tau to define sigma later on
-
-#install.packages("mvtnorm") # Loading a package that contains the multivariate normal pdf
-library("mvtnorm") # This command reads the mvtnorm package into R's memory. NOW we can use dmvnorm function.
-
-# rename x columns
-covNames <- names(womenwork)[2:length(names(womenwork))]
-nPara <- ncol(X) #dim(x)[2] 
-
-# Setting up the prior
-mu <- as.vector(rep(mu,nPara)) # Prior mean vector
-Sigma <- tau^2*diag(nPara)
-
-
-# Defining the functions that returns the log posterior (Logistic and Probit models). Note that the first input argument of
-
-# this function must be the one that we optimize on, i.e. the regression coefficients.
-
-LogPostLogistic <- function(betaVect,y,X,mu,Sigma){
-  
-  nPara <- length(betaVect);
-  linPred <- X%*%betaVect;
-  
-  # evaluating the log-likelihood                                    
-  logLik <- sum( linPred*y -log(1 + exp(linPred)));
-  if (abs(logLik) == Inf) logLik = -20000; # Likelihood is not finite, stear the optimizer away from here!
-  
-  # evaluating the prior
-  logPrior <- dmvnorm(betaVect, matrix(0,nPara,1), Sigma, log=TRUE);
-  
-  # add the log prior and log-likelihood together to get log posterior
-  return(logLik + logPrior)
-}
-
-# Different starting values. Ideally, any random starting value gives you the same optimum (i.e. optimum is unique)
-initVal <- as.vector(rep(0,dim(X)[2]))
-# Or a random starting vector: as.vector(rnorm(dim(X)[2]))
-# Set as OLS estimate: as.vector(solve(crossprod(X,X))%*%t(X)%*%y); # Initial values by OLS
-
-OptimResults<-optim(initVal,LogPostLogistic,gr=NULL,y,X,mu,Sigma,method=c("BFGS"),control=list(fnscale=-1),hessian=TRUE)
-
-
-OptimResults<-optim(initVal,
-                    LogPostLogistic,
-                    gr=NULL,
-                    y,X,mu,Sigma,
-                    method=c("BFGS"),
-                    control=list(fnscale=-1),
-                    hessian=TRUE) # hessian=TRUE -> output includes hessian matrix
-
-
-# Printing the results to the screen
-postMode <- OptimResults$par
-postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(Hessian)
-names(postMode) <- covNames # Naming the coefficient by covariates
-approxPostStd <- sqrt(diag(postCov)) # Computing approximate standard deviations.
-names(approxPostStd) <- covNames # Naming the coefficient by covariates
-print('The posterior mode is:')
-print(postMode)
-print('The approximate posterior standard deviation is:')
-print(approxPostStd)
-
-```
 
 
 ```{r, echo=FALSE, eval=FALSE}
@@ -376,12 +475,120 @@ postCov[par1,par2]/(sqrt(postCov[par1,par1])*sqrt(postCov[par2,par2]))
 
 ```
 
+```{r}
+# given values for the prior 
+mu = 0
+tau = 10  # Prior scaling factor such that Prior Covariance = (tau^2)*I - need tau to define sigma later on
+
+#install.packages("mvtnorm") # Loading a package that contains the multivariate normal pdf
+library("mvtnorm") # This command reads the mvtnorm package into R's memory. NOW we can use dmvnorm function.
+
+# rename x columns
+covNames <- names(womenwork)[2:length(names(womenwork))]
+nPara <- ncol(X) #dim(x)[2] 
+
+# Setting up the prior
+mu <- as.vector(rep(mu,nPara)) # Prior mean vector
+Sigma <- tau^2*diag(nPara)
+
+
+# Defining the functions that returns the log posterior (Logistic and Probit models). Note that the first input argument of
+
+# this function must be the one that we optimize on, i.e. the regression coefficients.
+
+LogPostLogistic <- function(betaVect,y,X,mu,Sigma){
+  
+  nPara <- length(betaVect);
+  linPred <- X%*%betaVect;
+  
+  # evaluating the log-likelihood                                    
+  logLik <- sum( linPred*y -log(1 + exp(linPred)));
+  if (abs(logLik) == Inf) logLik = -20000; # Likelihood is not finite, stear the optimizer away from here!
+  
+  # evaluating the prior
+  logPrior <- dmvnorm(betaVect, matrix(0,nPara,1), Sigma, log=TRUE);
+  
+  # add the log prior and log-likelihood together to get log posterior
+  return(logLik + logPrior)
+}
+
+# Different starting values. Ideally, any random starting value gives you the same optimum (i.e. optimum is unique)
+initVal <- as.vector(rep(0,dim(X)[2]))
+# Or a random starting vector: as.vector(rnorm(dim(X)[2]))
+# Set as OLS estimate: as.vector(solve(crossprod(X,X))%*%t(X)%*%y); # Initial values by OLS
+
+OptimResults<-optim(initVal,LogPostLogistic,gr=NULL,y,X,mu,Sigma,method=c("BFGS"),control=list(fnscale=-1),hessian=TRUE)
+
+
+OptimResults<-optim(initVal,
+                    LogPostLogistic,
+                    gr=NULL,
+                    y,X,mu,Sigma,
+                    method=c("BFGS"),
+                    control=list(fnscale=-1),
+                    hessian=TRUE) # hessian=TRUE -> output includes hessian matrix
+
+
+# Printing the results to the screen
+postMode <- OptimResults$par
+postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(Hessian)
+names(postMode) <- covNames # Naming the coefficient by covariates
+approxPostStd <- sqrt(diag(postCov)) # Computing approximate standard deviations.
+names(approxPostStd) <- covNames # Naming the coefficient by covariates
+print('The posterior mode is:')
+print(postMode)
+print('The approximate posterior standard deviation is:')
+print(approxPostStd)
+```
+
+We can see in the output above, the feature "NSmallChild" with the biggest influence. 
+In this case, the number is negative, which means it has the greatest influence on the response variable work. Woman with small children are more likely not to work. 
+
+
+```{r, echo=FALSE}
+# 95% credebile interval 
+ggplot(womenwork,aes(x=NSmallChild))+
+    geom_density(alpha=.2, fill="#FF6666") 
+
+b <- 0.95
+CI_095 <- quantile(womenwork$NSmallChild, probs = b)
+
+plot_2b1 <- ggplot(womenwork,aes(x=NSmallChild))+
+  geom_density(alpha=.2, fill="#FF6666") +
+  geom_vline(aes(xintercept = CI_095))+
+  geom_text(aes(label ="95 % credible interval", x =  CI_095 + 0.3, y = 0.5),size = 3 ) +
+  ggtitle("Denisty number of small child")
+
+plot_2b2_density <- ggplot(womenwork,aes(x=NSmallChild))+
+  geom_histogram(aes(y=..density..),
+                 colour="black",
+                 fill="white",
+                 bins=30) + ggtitle("Denisty - Histogram number of small child")
+
+plot_2b2_hist <- ggplot(womenwork,aes(x=NSmallChild))+
+  geom_histogram(aes(y=..density..),
+                 colour="black",
+                 fill="white",
+                 bins=30) +
+  ggtitle("Histogram number of small child")
+
+grid.arrange(plot_2b2_density, plot_2b1, nrow = 2)
+```
+
+It is to be recognized the 95% credible interval for the feature "NSmallChild" has one child. 
 
 
 
 ##(c) Simulates from the predictive distribution
 Write a function that simulates from the predictive distribution of the response variable in a logistic regression. Use your normal approximation from 2(b). Use that function to simulate and plot the predictive distribution for the *Work* variable for a 40 year old woman, with two children (3 and 9 years old), 8 years of education, 10 years of experience. and a husband with an income of 10. [Hint: the R package *mvtnorm* will again be handy. And remember my discussion on how Bayesian prediction can be done by simulation.]
 
+```{r}
+# the specific data
+
+womenwork_test <- subset(womenwork,womenwork$Age >= 35 && womenwork$Age <= 45)
+womenwork_test <- subset(womenwork_test, womenwork_test$EducYears >= 6 && womenwork_test$EducYears <= 10)
+
+```
 
 
 \newpage
