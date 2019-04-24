@@ -251,12 +251,13 @@ $$\ Pr(y = 1\mid \boldsymbol x) = \frac{\exp(\boldsymbol x^T\beta)}{1+\exp(\bold
 where $y$ is the binary variable with $y=1$ if the woman works and  $y=0$ if she does not. $\boldsymbol x$ is a 8-dimensional vector containing the eight features (including a one for the constant term that models the intercept). Fit the logistic regression using maximum likelihood estimation by the command: **glmModel <- glm(Work** $\boldsymbol \sim$ **0 + ., data = WomenWork, family = binomial)**. Note how I added a zero in the model formula so that R doesn???t add an extra intercept (we already have an intercept term from the *Constant* feature). Note also that a dot (.) in the model formula means to add all other variables in the dataset as features. *family = binomial* tells R that we want to fit a logistic regression.
 
 ```{r}
-# load the data & define y (response) and x 8 dimensional vector of the features
-WomenWork = read.table("WomenWork.dat", header = TRUE)
-y = WomenWork$Work
-X = WomenWork[,2:9]
-X = as.matrix(X)
-n = nrow(WomenWork) # nr of observations
+# load the data 
+# define y (response) and X (8 dimensional vector of the features)
+WomenWork <- read.table("WomenWork.dat", header = TRUE)
+y <- WomenWork$Work  
+X <- as.matrix(WomenWork[,2:9])
+n <- nrow(WomenWork)  # nr of observations
+m <- ncol(X)  # nr of parameters
 ```
 
 
@@ -264,7 +265,6 @@ n = nrow(WomenWork) # nr of observations
 # logistic regression
 glmModel <- glm(Work ~ 0 + ., data = WomenWork, family = binomial)
 summary(glmModel)
-
 ```
 
 
@@ -273,7 +273,7 @@ Our goal is to approximate the posterior distribution of the 8-dim parameter vec
 
 $$ \beta \mid \boldsymbol y, \boldsymbol X \sim  \mathcal{N} \big( \widetilde{\beta}, J^{-1}_{\boldsymbol y}(\widetilde{\beta})  \big)$$
 
-where $\widetilde{\beta}$ is the posterior mode and $J(\widetilde{\beta}) = \frac{\partial^2 \ ln\ p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T} \mid_{\beta = \tilde{\beta}}$ is the observed Hessian evaluated at the posterior mode. Note that $\frac{\partial^2 \ ln p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T}$ is an 8 $\times$ 8 matrix with second derivatives on the diagonal and cross-derivatives $\frac{\partial^2 \ ln p( \beta \mid \boldsymbol y)}{\partial \beta_i \partial \beta_j}$  on the offdiagonal. It is actually not hard to compute this derivative by hand, but don???t worry, we will let the computer do it numerically for you. Now, both $\tilde{\beta}$ and $J(\tilde{\beta})$ are computed by the optim function in R. See my code ** https://github.com/ mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam. ** **zip** where I have coded everything up for the spam prediction example (it also does probit regression, but that is not needed here). I want you to implement you own version of this. You can use my code as a template, but I want you
+where $\widetilde{\beta}$ is the posterior mode and $J(\widetilde{\beta}) = \frac{\partial^2 \ ln\ p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T} \mid_{\beta = \tilde{\beta}}$ is the observed Hessian evaluated at the posterior mode. Note that $\frac{\partial^2 \ ln p(\beta \mid \boldsymbol y)}{\partial \beta \partial \beta^T}$ is an 8 $\times$ 8 matrix with second derivatives on the diagonal and cross-derivatives $\frac{\partial^2 \ ln p( \beta \mid \boldsymbol y)}{\partial \beta_i \partial \beta_j}$  on the offdiagonal. It is actually not hard to compute this derivative by hand, but don't worry, we will let the computer do it numerically for you. Now, both $\tilde{\beta}$ and $J(\tilde{\beta})$ are computed by the optim function in R. See my code ** https://github.com/ mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam. ** **zip** where I have coded everything up for the spam prediction example (it also does probit regression, but that is not needed here). I want you to implement you own version of this. You can use my code as a template, but I want you
 to write your own file so that you understand every line of your code. Don???t just copy my code. Use the prior $\beta \sim \mathcal{N}(0, \tau^2 I)$, with $\tau = 10$. 
 Your report should include your code as well as numerical values for $\tilde{\beta}$ and $J^{-1}_{\boldsymbol y}(\tilde{\beta})$ for *Womanwork* data. Compute an approximate 95% credible interval for the variable NSmallChild. Would you say that this feature is an important determinant of the probability that a women works?
 
@@ -284,7 +284,6 @@ tau <- 10  # Prior scaling factor such that Prior Covariance = (tau^2)*I - need 
 
 # rename X columns
 covNames <- names(WomenWork)[2:length(names(WomenWork))]
-m <- dim(X)[2]
 
 # setting up the prior
 mu    <- as.vector(rep(mu,m))  # Prior mean vector
@@ -293,46 +292,42 @@ Sigma <- tau^2*diag(m)  # Prior variance matrix
 # Defining the functions that returns the log posterior (Logistic models). 
 # Note that the first input argument of this function must be the one that we optimize on, i.e. the regression coefficients.
 
-LogPostLogistic <- function(beta, y, X, mu, Sigma){
+LogPostLogistic <- function(betaVect, y, X, mu, Sigma){
   
-  M <- length(beta)
-  p <- X %*% beta
+  nPara <- length(betaVect);
+  linPred <- X%*%betaVect;
   
-  # log the likelihood of Binomial Distribution  
-  logLik <- sum(p * y - log(1 + exp(p)))
-  if (abs(logLik) == Inf){
-    logLik <- -50000
-    # Likelihood is not finite, stear the optimizer away from here!
-  }
+  # evaluating the log-likelihood                                    
+  logLik <- sum( linPred*y -log(1 + exp(linPred)));
+  if (abs(logLik) == Inf) logLik = -20000; # Likelihood is not finite, stear the optimizer away from here!
   
-  # prior follows multi-normal distribution with 
-  logPrior <- dmvnorm(beta, mu, Sigma, log = TRUE)
+  # evaluating the prior
+  logPrior <- dmvnorm(betaVect, matrix(0,nPara,1), Sigma, log=TRUE);
   
-  # cuz we logarithmize the likelihood and prior,
-  # posterior is the sum of them
+  # add the log prior and log-likelihood together to get log posterior
   return(logLik + logPrior)
 }
 
-# use random initial values
-initVal <- as.vector(rnorm(dim(X)[2]))
+# Different starting values. Ideally, any random starting value gives you the same optimum (i.e. optimum is unique)
+initVal <- as.vector(rep(0,dim(X)[2]))
+# Or a random starting vector: as.vector(rnorm(dim(X)[2]))
 # Set as OLS estimate: as.vector(solve(crossprod(X,X))%*%t(X)%*%y); # Initial values by OLS
 
-OptimResults <- optim(initVal,
-                   LogPostLogistic,
-                   y = y, 
-                   X = X, 
-                   mu = mu, 
-                   Sigma = Sigma, 
-                   method = c("BFGS"),
-                   control = list(fnscale=-1),
-                   hessian = TRUE)  # output hessian matrix
+OptimResults<-optim(initVal,LogPostLogistic,gr=NULL,y,X,mu,Sigma,method=c("BFGS"),control=list(fnscale=-1),hessian=TRUE)
 
+
+OptimResults<-optim(initVal,
+                    LogPostLogistic,
+                    gr=NULL,
+                    y,X,mu,Sigma,
+                    method=c("BFGS"),
+                    control=list(fnscale=-1),
+                    hessian=TRUE) # hessian=TRUE -> output includes hessian matrix
 
 
 # Printing the results to the screen
 postMode <- OptimResults$par
 postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(Hessian)
-
 names(postMode) <- covNames # Naming the coefficient by covariates
 approxPostStd <- sqrt(diag(postCov)) # Computing approximate standard deviations.
 names(approxPostStd) <- covNames # Naming the coefficient by covariates
@@ -343,23 +338,6 @@ print(approxPostStd)
 
 ```
 
-```{r}
-# Compute an approximate 95% credible interval for the variable NSmallChild
-
-# By simulation
-data.NSmallChild <- as.data.frame(
-  mvtnorm::rmvnorm(n = 1000, mean = postMode, sigma = postCov)
-  )[,7]
-
-quantile(data.NSmallChild, probs = c(0.025,0.975))
-
-# By mean and standard deviation
-interval <- c(postMode[7]-1.96*approxPostStd[7], postMode[7]+1.96*approxPostStd[7])
-names(interval) <- NULL
-cat(interval)
-```
-
-The credible interval for variable NSmallChild is always smaller than 0, which means such feature has an obvious negative impact to women work.
 
 ```{r, echo=FALSE, eval=FALSE}
 
@@ -488,34 +466,7 @@ postCov[par1,par2]/(sqrt(postCov[par1,par1])*sqrt(postCov[par2,par2]))
 ## (c) Simulates from the predictive distribution
 Write a function that simulates from the predictive distribution of the response variable in a logistic regression. Use your normal approximation from 2(b). Use that function to simulate and plot the predictive distribution for the *Work* variable for a 40 year old woman, with two children (3 and 9 years old), 8 years of education, 10 years of experience. and a husband with an income of 10. [Hint: the R package *mvtnorm* will again be handy. And remember my discussion on how Bayesian prediction can be done by simulation.]
 
-```{r}
-# 1000 simulations of beta
-data.hist <- as.data.frame(
-  mvtnorm::rmvnorm(n = 1000, mean = postMode, sigma = postCov)
-  )
-colnames(data.hist) <- covNames
 
-f <- function(cname){
-  ggplot(data.hist, aes_string(x=cname)) +
-    geom_histogram(aes(y = ..density..),
-                   colour = "black",
-                   fill   = "white",
-                   bins   = 30) +
-    geom_density(alpha = .2, fill = "#FF6666")
-}
-plot(arrangeGrob(grobs = lapply(covNames, f)))
-```
-
-
-```{r}
-example <- matrix(c(1, 10, 8, 10, (10/10)^2, 40, 1, 1), nrow = 1)
-# 1000 predictions for such example
-pred.hist <- as.data.frame(t(example %*% t(data.hist)))
-ggplot(pred.hist, aes(x=V1)) +
-  geom_density(alpha = .2, fill = "#FF6666")
-```
-
-No work
 
 \newpage
 # Appendix
