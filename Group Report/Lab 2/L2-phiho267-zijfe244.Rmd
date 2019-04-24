@@ -108,10 +108,10 @@ plot1a.ori <- ggplot(data.1a)+
 
 ```{r echo=FALSE}
 # modify the parameters
-mu_0     <- c(-11, 104, -98)
+mu_0     <- c(-11, 104, -98)  # c(-10, 100, -100)
 omega_0  <- 0.01 * diag(3)
 v_0      <- 4
-sigma2_0 <- 0.02
+sigma2_0 <- 0.02              # 1
 
 prior <- matrix(ncol = 3, nrow = N)
 for (i in 1:N) {
@@ -135,8 +135,6 @@ plot1a.mdf <- ggplot(data.1a)+
   theme(legend.position = "none")
 
 plot(arrangeGrob(plot1a.ori, plot1a.mdf, nrow = 2))
-# plot1a.ori
-# plot1a.mdf
 ```
 
 
@@ -226,6 +224,11 @@ ggplot(data.1c) +
 ## (d) Polynomial model of order 7
 Say now that you want to *estimate a polynomial model of order 7*, but you suspect that higher order terms may not be needed, and you worry about overfitting. Suggest a suitable prior that mitigates this potential problem. You do not need to compute the posterior, just write down your prior. [Hint: the task is to specify $\mu_0$ and $\Omega_0$ in a smart way.]
 
+According to slide 11 in Lecture 5, too many knots may result in overfitting. We can use regularization prior to avoid such problem. Using 
+$$\beta_i \sim N(\mu_0,\frac{\sigma^2}{\lambda}),\ \  where \ \ \Omega_0 = \lambda\cdot I_3, $$
+
+the parameter $\lambda$ will control the variance of $\beta_i$. If $\lambda$ is larger, $\beta_i$ would be much closer to $\mu_0$.
+
 \newpage
 
 ```{r}
@@ -236,10 +239,9 @@ rm(list=ls())
 # 2. Posterior approximation for classification with logistic regression
 The dataset **WomenWork.dat** contains *n* = 200 observations (i.e. women) on the following nine variables:
 
-```{r, eval = FALSE,echo=FALSE, out.width="350px", out.height="300px", fig.align = "center"}
+```{r, eval = FALSE, echo=FALSE, out.width="350px", out.height="300px", fig.align = "center"}
 knitr::include_graphics("lab2_table_ex2.png")
 ```
-
 
 
 ## (a) Consider the logistic regression
