@@ -90,14 +90,15 @@ for (i in 1:N) {
 ```
 
 ```{r echo=FALSE}
-data.1a <- as.data.frame(cbind(tempdata$time, X%*%t(prior)))
+data.1a <- as.data.frame(cbind(tempdata$time, X%*%t(prior))) 
+
 
 cnames <- c("x")
 for (i in 1:N) {
   cnames[1+i] <- paste0("pred.",i)
 }
 colnames(data.1a) <- cnames
-data.1a <- melt(data.1a, id.vars = "x")
+data.1a <- melt(data.1a, id.vars = "x") # data.1a - variable to create a color for each line
 
 plot1a.ori <- ggplot(data.1a)+
   geom_line(aes(x = x, y = value, color = variable)) +
@@ -108,11 +109,14 @@ plot1a.ori <- ggplot(data.1a)+
 
 ```{r echo=FALSE}
 # modify the parameters
-mu_0     <- c(-11, 104, -98)  # c(-10, 100, -100)
+mu_0     <- c(-10.68, 93.60, -85.83)  
+# before c(-10, 100, -100), change into values given in the lm output
 omega_0  <- 0.01 * diag(3)
 v_0      <- 4
-sigma2_0 <- 0.02              # 1
+sigma2_0 <- 0.02              # before 1 - change 
 
+
+# -------------------------- same code as before - maybe create a function
 prior <- matrix(ncol = 3, nrow = N)
 for (i in 1:N) {
   var  <- LaplacesDemon::rinvchisq(1 ,v_0, sigma2_0)
@@ -147,7 +151,7 @@ of $\beta_0, \beta_1, \beta_2$ and $\sigma^2$. Plot the marginal posteriors for 
 k        <- 3 #  nr of regression coefficients
 beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
 mu_n     <- solve(t(X) %*% X + omega_0) %*% (t(X) %*% X %*% beta_hat + omega_0 %*% mu_0)
-omega_n    <- t(X) %*% X+omega_0
+omega_n  <- t(X) %*% X+omega_0
 v_n      <- v_0 + n
 sigma2_n <- (v_0 * sigma2_0 + (t(y) %*% y + t(mu_0) %*% omega_0 %*% mu_0 - t(mu_n) %*% omega_n %*% mu_n)) / v_n
 
@@ -158,10 +162,13 @@ sigma2_n <- (v_0 * sigma2_0 + (t(y) %*% y + t(mu_0) %*% omega_0 %*% mu_0 - t(mu_
 ######
 
 data_hist <- as.data.frame(
-  mvtnorm::rmvt(n = 100, delta = mu_n, df = n-k,
-                sigma = as.numeric(sigma2_n) * solve(omega_n))
+  mvtnorm::rmvt(n = 1000, delta = mu_n, df = n-k,
+                sigma = as.numeric(sigma2_n) * solve(t(X) %*% X))
   )
-cnames <- c("beta0", "beta1", "beta2")
+var_hist <- LaplacesDemon::rinvchisq(n = 1000, v_n, sigma2_n)
+data_hist <- cbind(data_hist, var_hist)
+cnames <- c("beta0", "beta1", "beta2", "sigma2")
+
 colnames(data_hist) <- cnames
 
 f <- function(cname){
