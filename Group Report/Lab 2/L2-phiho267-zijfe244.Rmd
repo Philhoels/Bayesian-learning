@@ -68,11 +68,6 @@ lmTemp = lm( temp ~ time + I(time^2), data = tempdata)
 ```
 
 ```{r, echo=FALSE}
-lmTemp
-```
-
-
-```{r, echo=FALSE}
 summary(lmTemp)
 ```
 
@@ -120,7 +115,6 @@ for (i in 1:N) {
 ```{r echo=FALSE}
 data.1a <- as.data.frame(cbind(tempdata$time, X%*%t(prior))) 
 
-
 cnames <- c("x")
 for (i in 1:N) {
   cnames[1+i] <- paste0("pred.",i)
@@ -148,9 +142,10 @@ sigma2_0 <- 0.02              # before 1 - change
 
 ```
 
+\newpage
 
 Regression curves by simulating draws from the joint prior of all parameters. 
-The number of drwas is 40. 
+The number of draws is 40. 
 
 It can be observed that some simulation at the given parameters an absolutely unrealistic temperature, some go from -50 to -150. 
 
@@ -271,7 +266,7 @@ beta_median = matrixStats::colMedians(as.matrix(data_hist))
 # lecture 5 slide 5
 
 # f(time) = beta_0 + beta_1 * time + beta_2 * time^2
-pred.1b = beta_median %*% t(X)
+pred.1b <- beta_median %*% t(X)
 
 ```
 
@@ -386,17 +381,10 @@ X = as.matrix(X)
 n = nrow(WomenWork) # nr of observations
 ```
 
-
 ```{r}
 # logistic regression
 glmModel <- glm(Work ~ 0 + ., data = WomenWork, family = binomial)
 ```
-
-
-```{r, echo=FALSE}
-glmModel
-```
-
 
 ```{r, echo=FALSE}
 summary(glmModel)
@@ -427,10 +415,6 @@ m <- dim(X)[2]
 mu    <- as.vector(rep(mu,m))  # Prior mean vector
 Sigma <- tau^2 * diag(m)  # Prior variance matrix
 
-# Defining the functions that returns the log posterior (Logistic models). 
-# Note that the first input argument of this function must be the one that
-# we optimize on, i.e. the regression coefficients.
-
 LogPostLogistic <- function(beta, y, X, mu, Sigma){
   
   M <- length(beta)
@@ -441,6 +425,7 @@ LogPostLogistic <- function(beta, y, X, mu, Sigma){
   if (abs(logLik) == Inf){
     logLik <- -50000
     # Likelihood is not finite, stear the optimizer away from here!
+    # by Teacher's idea
   }
   
   # prior follows multi-normal distribution with 
@@ -453,8 +438,6 @@ LogPostLogistic <- function(beta, y, X, mu, Sigma){
 
 # use random initial values
 initVal <- as.vector(rnorm(dim(X)[2]))
-# Set as OLS estimate: as.vector(solve(crossprod(X,X))%*%t(X)%*%y); 
-# Initial values by OLS
 
 OptimResults <- optim(initVal,
                    LogPostLogistic,
@@ -466,15 +449,18 @@ OptimResults <- optim(initVal,
                    control = list(fnscale=-1),
                    hessian = TRUE)  # output hessian matrix
 
-
-
 # Printing the results to the screen
 postMode <- OptimResults$par
-postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(Hessian)
 
-names(postMode) <- covNames # Naming the coefficient by covariates
-approxPostStd <- sqrt(diag(postCov)) # Computing approximate standard deviations.
-names(approxPostStd) <- covNames # Naming the coefficient by covariates
+# Posterior covariance matrix is -inv(Hessian)
+postCov <- -solve(OptimResults$hessian) 
+
+# Computing approximate standard deviations.
+approxPostStd <- sqrt(diag(postCov)) 
+
+# Naming the coefficient by covariates
+names(postMode) <- covNames 
+names(approxPostStd) <- covNames 
 ```
 
 ```{r, echo=FALSE}
@@ -517,7 +503,7 @@ The credible interval for variable NSmallChild is always smaller than 0, which m
 ```{r, echo=FALSE, eval=FALSE}
 
 ###################################################################################
-# Author: Mattias Villani, Link??ping University. 
+# Author: Mattias Villani, Linkoping University. 
 #         E-mail: mattias.villani@liu.se
 #         web: http://mattiasvillani.com
 # Script to illustrate numerical maximization of the Logistic or Probit regression
@@ -780,12 +766,10 @@ ggplot(pred.hist, aes(x=V1)) +
 
 ```
 
-
-No work
+Thus, we can trust that the woman does not work with 95% confident level.
 
 \newpage
 # Appendix
 
 ```{r ref.label=knitr::all_labels(), echo = T, eval = F}
 ```
-

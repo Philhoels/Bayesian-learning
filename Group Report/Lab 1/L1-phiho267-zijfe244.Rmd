@@ -135,7 +135,9 @@ result_1b_data = data.frame("Expected value" = exact_value_1b,
 knitr::kable(result_1b_data)
 ```
 
-The posterior probabilities from simulation and theoritical formula (exact value) are quite similar.
+The expected value represents the accurate area of a part of beta distribution. On the contrary, the simulated value represents an estimation based on our 10000 simulations.
+
+The posterior probabilities from simulation and theoritical formula (expected value) are quite similar.
 
 ## (c) Compute the posterior distribution of the log-odds 
 $\phi = log(\frac{\theta}{1-\theta})$(nDraws = 10000). 
@@ -208,14 +210,14 @@ $$ Var[\theta] = \frac{2n^2\tau^4}{(n-2)^2(n-4)}\ for\ n>4$$
 
 ```{r}
 # --- theoreticle value 
-# calculate tau with given formula
-tau = function(y,mu = 3.5){
+# calculate tau2 with given formula
+tau2 = function(y,mu = 3.5){
   n = length(y)
   result = sum((log(y)-mu)^2)/n
   return(result)
 }
 
-tau_2 = tau(observations)
+tau_2 = tau2(observations)
 
 # theoreticle mean
 theoreticle_mean = n_observations * tau_2/(n_observations-2)
@@ -224,9 +226,13 @@ theoreticle_mean = n_observations * tau_2/(n_observations-2)
 theoreticle_var = 2 * n_observations^2 * tau_2^2 /
   ((n_observations -2)^2 * (n_observations - 4))
 
-# --- exact values by LaplacesDemon
+# --- exact PDF by LaplacesDemon
 xgrid <- seq(0.01,1,0.001)
-val <- LaplacesDemon::dinvchisq(xgrid, df=10, scale=tau_2)
+val <- LaplacesDemon::dinvchisq(xgrid, df=n_observations, scale=tau_2)
+
+# --- exact PDF by Wikipedia
+t <- n_observations/2
+val2 <- ((tau_2*t)^(t))/gamma(t)*exp(-n_observations*tau_2/(2*xgrid))/xgrid^(1+t)
 ```
 
 
@@ -244,8 +250,6 @@ for (i in 1:nDraws_2b) {
 }
 ```
 
-
-
 ```{r echo=FALSE,warning=FALSE}
 data_2a = data.frame(computed_variance)
 
@@ -255,14 +259,14 @@ p2a1=ggplot(data_2a,aes(x=computed_variance))+
                  fill="white",
                 bins = 30)+
   geom_density(alpha=.2, fill="#FF6666") + 
-  ggtitle(TeX("Histogram of $\\sigma^2$ from rchisq with formula in lecture 3"))+
+  ggtitle(TeX("Histogram of $\\sigma^2$ by simulations"))+
   scale_x_continuous(limits = c(0,1))
 
 data_2a = data.frame(xgrid,val)
-p2a2=ggplot(data_2a,aes(x=xgrid,y=val))+
+p2a2=ggplot(data_2a,aes(x=xgrid,y=val2))+
  geom_line()+
   # geom_density(alpha=.2, fill="#FF6666") + 
-  ggtitle(TeX("Histogram of $\\sigma^2$ by LaplacesDemon"))+
+  ggtitle(TeX("theoretical PDF of $\\sigma^2 \\sim Inv - \\chi^2(n,\\tau^2)$"))+
   scale_x_continuous(limits = c(0,1))
 
 grid.arrange(p2a2,p2a1, nrow = 2)
@@ -478,6 +482,7 @@ of $\kappa$ for the wind direction data over a fine grid of $\kappa$ values.
 of $\kappa$ from the information in a).
 
 ```{r, echo=FALSE}
+rm(list = ls())
 # given values 
 degrees = c(40, 303, 326, 285, 296, 314, 20, 308, 299, 296)
 n_degrees = length(degrees)
