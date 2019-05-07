@@ -487,8 +487,15 @@ rm(list = ls())
 degrees = c(40, 303, 326, 285, 296, 314, 20, 308, 299, 296)
 n_degrees = length(degrees)
 radians = c(-2.44, 2.14, 2.54, 1.83, 2.02, 2.33, -2.79, 2.23, 2.07, 2.02)
-n_radians = length(radians)
 mu_3a = 2.39
+mu_sample = mean(radians)
+sd_sample = sd(radians)
+
+radians = (radians-mu_sample)/sd_sample
+mu_3a = (mu_3a-mu_sample)/sd_sample
+n_radians = length(radians)
+
+
 # grid of k values
 k = seq(from = 0.1,to = 8, by = 0.01) # k>0
 ```
