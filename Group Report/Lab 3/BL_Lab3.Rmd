@@ -1,7 +1,7 @@
 ---
 title: "Computer Lab 3"
-author: "Phillip Hölscher"
-date: "3 5 2019"
+author: "phiho267 & zijfe244"
+date: "3-5-2019"
 output: 
   pdf_document: 
     toc: TRUE
@@ -15,6 +15,11 @@ knitr::opts_chunk$set(echo = TRUE)
 The data **rainfall.dat** consist of daily records, from the beginning of 1948 to the
 end of 1983, of precipitation (rain or snow in units of $\frac{1}{100}$ inch, and records of zero
 precipitation are excluded) at Snoqualmie Falls, Washington. Analyze the data using the following two models.
+
+```{r}
+data.1 <- read.table("rainfall.dat")
+```
+
 
 ## (a) Normal model.
 Assume the daily precipitation $\{y_1,...,y_n\}$ are independent normally distributed, $y_1,...,y_n \mid \mu, \sigma^2 \sim \mathcal{N}(\mu, \sigma^2)$ where both $\mu$ and $\sigma^2$ are unknown. Let $\mu \sim \mathcal{N}(\mu_0, \tau^2_0)$ independently of $\sigma^2 \sim (v_0, \sigma^2_0)$.
