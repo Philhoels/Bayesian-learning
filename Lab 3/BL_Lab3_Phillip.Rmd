@@ -159,22 +159,24 @@ plot_data_q1aii <- plot_data_q1aii[1:100,] # test- just take the first x rows
 # ggplot(plot_data_q1aii) + 
 #   geom_line(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)
 
-ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + 
-  geom_point(aes(color = "Markov chains")) + 
-  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start")) +
+plot_mu_vs_sigma_dot <- ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) +   geom_point(aes(color = "Markov chains")) + 
+  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start"), size = 3) +
   geom_point(aes(x = plot_data_q1aii$mu[length(plot_data_q1aii$mu)], 
-                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end")) +
-  ggtitle("mu vs sigma2") + ylab("sigma2") + xlab("mu") +
+                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end"), size = 3) +
+  ggtitle("mu vs sigma2 - dots") + ylab("sigma2") + xlab("mu") +
   theme(legend.position = "bottom")
+plot_mu_vs_sigma_dot
 
-ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + 
-  geom_path(aes(color = "Markov chains")) + 
-  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start")) +
+```
+
+```{r, echo=FALSE}
+plot_mu_vs_sigma_line <- ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + geom_path(aes(color = "Markov chains")) + 
+  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start"), size = 3) +
   geom_point(aes(x = plot_data_q1aii$mu[length(plot_data_q1aii$mu)], 
-                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end")) +
-  ggtitle("mu vs sigma2") + ylab("sigma2") + xlab("mu") +
+                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end"), size = 3) +
+  ggtitle("mu vs sigma2 - line") + ylab("sigma2") + xlab("mu") +
   theme(legend.position = "bottom")
-
+plot_mu_vs_sigma_line
 ```
 
 
@@ -215,9 +217,9 @@ nu0 <- rep(4,nComp) # degrees of freedom for prior on sigma2
 nIter <- 100 # Number of Gibbs sampling draws
 
 # Plotting options
-# plotFit <- TRUE
-# lineColors <- c("blue", "green", "magenta", 'yellow')
-# sleepTime <- 0.1 # Adding sleep time between iterations for plotting
+plotFit <- TRUE
+lineColors <- c("blue", "green", "magenta", 'yellow')
+sleepTime <- 0.1 # Adding sleep time between iterations for plotting
 ################   END USER INPUT ###############
 
 ###### Defining a function that simulates from the 
@@ -255,12 +257,12 @@ sigma2 <- rep(var(x),nComp)
 probObsInComp <- rep(NA, nComp)
 
 # Setting up the plot
-# xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
-# xGridMin <- min(xGrid)
-# xGridMax <- max(xGrid)
-# mixDensMean <- rep(0,length(xGrid))
-# effIterCount <- 0
-# ylim <- c(0,2*max(hist(x)$density))
+xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
+xGridMin <- min(xGrid)
+xGridMax <- max(xGrid)
+mixDensMean <- rep(0,length(xGrid))
+effIterCount <- 0
+#ylim <- c(0,2*max(hist(x)$density))
 
 # -------------------- Update - start -------------------
 # we want to save mu??s and sigma??s for every interation
@@ -270,7 +272,7 @@ simulated_sigma <- matrix(data = NA, nrow = nIter, ncol = 2)
 # -------------------- Update - end -------------------
 
 for (k in 1:nIter){
-  # message(paste('Iteration number:',k))
+  #message(paste('Iteration number:',k))
   # Just a function that converts between different
   # representations of the group     allocations
   alloc <- S2alloc(S)  
@@ -315,32 +317,27 @@ for (k in 1:nIter){
     S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
   }
   
-  # # Printing the fitted density against data histogram
-  # if (plotFit && (k%%1 ==0)){
-  #   effIterCount <- effIterCount + 1
-  #   hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
-  #   mixDens <- rep(0,length(xGrid))
-  #   components <- c()
-  #   for (j in 1:nComp){
-  #     compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
-  #     mixDens <- mixDens + pi[j]*compDens
-  #     lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
-  #     components[j] <- paste("Component ",j)
-  #   }
-  #   mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
-  #   
-  #   lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
-  #   legend("topleft", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
-  #          col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
-  #   Sys.sleep(sleepTime)
-  # }
+  # Printing the fitted density against data histogram
+  if (plotFit && (k%%1 ==0)){
+    effIterCount <- effIterCount + 1
+    #hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
+    mixDens <- rep(0,length(xGrid))
+    components <- c()
+    for (j in 1:nComp){
+      compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+      mixDens <- mixDens + pi[j]*compDens
+      #lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
+      #components[j] <- paste("Component ",j)
+    }
+    mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
+
+    #lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
+    #legend("topleft", box.lty = 1, legend = c("Data histogram",components, 'Mixture'),
+          # col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
+    #Sys.sleep(sleepTime)
+  }
   
 }
-
-hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
-lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
-lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
-legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
 
 #########################    Helper functions    ##############################################
 
@@ -348,7 +345,7 @@ legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","N
 
 ```{r, warning=FALSE, eval=FALSE}
 # make the plot above with ggplot
-ggplot(data = x) +
+ggplot(data = as.data.frame(x)) +
   geom_histogram(aes(x = x))  
   
   
@@ -356,7 +353,9 @@ ggplot(data = as.data.frame(x), aes(x = x)) +
     geom_histogram(aes(y=..density..),
                  colour="black",
                  fill="white",
-                 bins=30) +
+                 bins=30) 
+
++
   geom_line(aes(x = xGrid, y = mixDensMean))
   
 ```
@@ -380,9 +379,60 @@ grid.arrange(plot_simulated_mu, plot_simulated_sigma, nrow = 2)
 
 
 ## (c) Graphical comparison.
-Let $\hat{\mu}$ denote the posterior mean of the parameter $\mu$ and correspondingly for the other parameters. Plot the following densities in one figure: 1) a histogram or kernel density estimate of the data. 2) Normal density $\mathcal{N} (\hat{\mu},\hat{\sigma}^2)$ in (a). 3) Mixture of normals density $\ p (y_i \mid \hat{\mu},\hat{\sigma}^2, \hat{\pi})$ in (b).
+Let $\hat{\mu}$ denote the posterior mean of the parameter $\mu$ and correspondingly for the other parameters. Plot the following densities in one figure: 
+
+1) a histogram or kernel density estimate of the data. 
+```{r, echo=FALSE}
+ggplot(data = rainfall, aes(x = precipitation)) + 
+  geom_histogram(aes(y=..density..),
+                 colour="black",
+                 fill="white",
+                 bins=30)
+```
 
 
+2) Normal density $\mathcal{N} (\hat{\mu},\hat{\sigma}^2)$ in (a). 
+```{r, echo=FALSE}
+
+# \hat{mu} & \hat{sigma}^2 - simulated with rnomal with this values
+
+# ggplot(data = Gibbs_sampling, aes(x = mu)) +
+#     geom_histogram(aes(y=..density..),
+#                  colour="black",
+#                  fill="white",
+#                  bins=30)
+# 
+# ggplot(data = Gibbs_sampling, aes(x = sigma2)) +
+#     geom_histogram(aes(y=..density..),
+#                  colour="black",
+#                  fill="white",
+#                  bins=30)
+
+# plot data 
+plot_data_q1c2 <- c()
+for (i in 1:nDraws) {
+  plot_data_q1c2[i] <-  rnorm(n = 1, mean = Gibbs_sampling$mu[i], 
+                           sd = sqrt(Gibbs_sampling$sigma2[i]))
+}
+# the plot
+ggplot(data = as.data.frame(plot_data_q1c2), aes(x = plot_data_q1c2)) +
+    geom_histogram(aes(y=..density..),
+                 colour="black",
+                 fill="white",
+                 bins=30)+
+  geom_density(alpha=.2, fill="#FF6666") +
+  xlab("values")
+
+```
+
+
+3) Mixture of normals density $\ p (y_i \mid \hat{\mu},\hat{\sigma}^2, \hat{\pi})$ in (b).
+```{r, echo=FALSE}
+hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
+lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
+lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
+legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
+```
 
 
 
