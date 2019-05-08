@@ -1,6 +1,6 @@
 ---
 title: "Computer Lab 3"
-author: "Phillip Hölscher"
+author: "Phillip H??lscher"
 date: "3 5 2019"
 output: 
   pdf_document: 
@@ -11,10 +11,27 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, echo=FALSE, warning=FALSE}
+# library used
+library(ggplot2)
+library(MASS) # To access the mvrnorm() function
+library(LaplacesDemon) # for rinvchisq
+library(gridExtra) # put plot together
+```
+
+
 # 1. Normal model, mixture of normal model with semi-conjugate prior.
 The data **rainfall.dat** consist of daily records, from the beginning of 1948 to the
 end of 1983, of precipitation (rain or snow in units of $\frac{1}{100}$ inch, and records of zero
 precipitation are excluded) at Snoqualmie Falls, Washington. Analyze the data using the following two models.
+
+```{r,echo=FALSE}
+# read data
+rainfall <- read.delim("rainfall.dat", header = FALSE)
+colnames(rainfall) <- c("precipitation")
+n = nrow(rainfall)
+```
+
 
 ## (a) Normal model.
 Assume the daily precipitation $\{y_1,...,y_n\}$ are independent normally distributed, $y_1,...,y_n \mid \mu, \sigma^2 \sim \mathcal{N}(\mu, \sigma^2)$ where both $\mu$ and $\sigma^2$ are unknown. Let $\mu \sim \mathcal{N}(\mu_0, \tau^2_0)$ independently of $\sigma^2 \sim (v_0, \sigma^2_0)$.
@@ -22,12 +39,150 @@ Assume the daily precipitation $\{y_1,...,y_n\}$ are independent normally distri
 
 - i. Implement (code!) a Gibbs sampler that simulates from the joint posterior $p(\mu,\sigma^2 \mid y_1,...,y_n)$ The full conditional posteriors are given on the slides from Lecture 7.
 
+```{r}
+# implement Gibbs sampling 
+# set seed
+set.seed(123456)
+
+# Gibbs sampling for normal model with non-conjugate prior - L7S15
+
+# prior parameter for sigma
+# initialized values - decided by my own
+# v_0 tells us how much we trust the prior
+v_0 <- 1 ###########------------------------------- ?
+#sigma2_0 <- 1 ###########------------------------------- ? 
+sigma2_0 <- var(rainfall$precipitation) # the variacne of the data or #Var(x_bar) = sigma^2/n
+# sigma
+sigma2 <- rinvchisq(n = 1, df = v_0, scale = sigma2_0)
+
+# prior parameter for mu
+# initialized values - decided by my own
+tau2_0 <- 1 ###########------------------------------- ?
+#tau2_0 <- sigma2_0
+mu_0 <- mean(rainfall$precipitation)
+# mu
+mu <- rnorm(n = 1, mean = mu_0, tau2_0)
+
+# the sampling
+nDraws <- 1000
+Gibbs_sampling <- data.frame("mu" = numeric(),
+                             "sigma2" = numeric())
+
+# for exercise 1aii
+# create vairables for mean and varaicne
+mean_vec <- vector(mode = "numeric", length = nDraws)
+variance_vec <- vector(mode = "numeric", length = nDraws)
+
+for (i in 1:nDraws) {
+  # full conditional posterior
+  # generate mu - need mu_n (need w to generate mu_n) & tau2_n
+  # mu_n - L2S3 - Normal data, known variance - normal prior
+  
+  # generate w
+  w <- (n/sigma2)/((n/sigma2) + (1/tau2_0))
+  # generate mu_n
+  mu_n <- w * mean(rainfall$precipitation) + (1 - w)
+  
+  # genearte tau2_n
+  tau2_n <- 1 / (n/sigma2 + 1/tau2_0)
+  
+  #-- generate mu 
+  mu <- rnorm(n = 1, mean = mu_n, sd = tau2_n)
+  
+  # generate sigma2 
+  # generate v_n - L53 - Normal model with normal prior
+  v_n = v_0 + n
+  
+  # generate second term - to sample sigma2
+  second_term <- (v_0 + sigma2 + sum((rainfall$precipitation - mu)^2))/ (n + v_0)
+  
+  #-- generate sigma2
+  sigma2 <- rinvchisq(n = 1, df = v_n, scale = second_term)
+  
+  # save mu & sigma in df
+  sampling <- data.frame("mu" = mu,
+                        "sigma2" = sigma2)
+  
+  # variables we want to save
+  Gibbs_sampling <- rbind(Gibbs_sampling, sampling)
+  #save the mean and variance
+  mean_vec[i] <- mean(Gibbs_sampling$mu)
+  variance_vec[i] <- var(Gibbs_sampling$sigma2)
+  
+}
+Gibbs_sampling$iterations <- 1:nDraws
+
+```
+
 - ii. Analyze the daily precipitation using your Gibbs sampler in (a)-i. Evaluate the convergence of the Gibbs sampler by suitable graphical methods, for example by plotting the trajectories of the sampled Markov chains.
+
+```{r, echo=FALSE}
+# plot mu and sigma2
+
+# plot mu
+plot_tace_mu <- ggplot(data = Gibbs_sampling) + 
+  geom_line(aes(x = iterations, y = mu, color = "mu")) + 
+  ggtitle("Tace of mu")
+  # plot sigma2
+plot_tace_sigma2 <-ggplot(data = Gibbs_sampling) + 
+  geom_line(aes(x = iterations, y = sigma2, color = "sigma2")) + 
+  ggtitle("Tace of sigma2")
+
+grid.arrange(plot_tace_mu, plot_tace_sigma2, nrow = 2)
+
+```
+
+
+```{r, warning=FALSE, echo=FALSE}
+# converge of mean 
+plot_converge_mu <- ggplot() + 
+  geom_line(aes(x = Gibbs_sampling$iterations, y = mean_vec, color = "mean")) + 
+  labs(title = "Convergence of mean", x = "interation", y = "mean")
+
+# converge of sigma 
+plot_converge_sigma <-ggplot() + 
+  geom_line(aes(x = Gibbs_sampling$iterations, y = variance_vec, color = "variance")) + 
+  labs(title = "Convergence of variance", x = "interation", y = "variance")
+
+grid.arrange(plot_converge_mu, plot_converge_sigma, nrow = 2)
+```
+
+
+
+
+```{r, echo=FALSE}
+# plotting the trajectories
+# plot data
+plot_data_q1aii <- Gibbs_sampling[,1:2]
+plot_data_q1aii <- plot_data_q1aii[1:100,] # test- just take the first x rows
+
+# ggplot(plot_data_q1aii) + 
+#   geom_line(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)
+
+ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + 
+  geom_point(aes(color = "Markov chains")) + 
+  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start")) +
+  geom_point(aes(x = plot_data_q1aii$mu[length(plot_data_q1aii$mu)], 
+                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end")) +
+  ggtitle("mu vs sigma2") + ylab("sigma2") + xlab("mu") +
+  theme(legend.position = "bottom")
+
+ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + 
+  geom_path(aes(color = "Markov chains")) + 
+  geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start")) +
+  geom_point(aes(x = plot_data_q1aii$mu[length(plot_data_q1aii$mu)], 
+                 y = plot_data_q1aii$sigma2[length(plot_data_q1aii$sigma2)], color = "end")) +
+  ggtitle("mu vs sigma2") + ylab("sigma2") + xlab("mu") +
+  theme(legend.position = "bottom")
+
+```
+
+
 
 ## (b) Mixture normal model.
 Let us now instead assume that the daily precipitation $\{y_1, ..., y_n\}$ follow an iid two-component **mixture of normals** model:
 
-$$ \ p (y_i \mid  \mu, \sigma^2, \pi) = \pi \mathcal{N}(y_i \mid  \mu_1, \sigma^2_1) + (1-\pi) \mathcal{N}(y_i \mid  \mu_2, \sigma^2_2), $$
+$$ \ p (y_i \mid  \mu, \sigma^2, \pi) = \pi \ \mathcal{N}(y_i \mid  \mu_1, \sigma^2_1) + (1-\pi) \mathcal{N}(y_i \mid  \mu_2, \sigma^2_2), $$
 
 where
 
@@ -36,11 +191,202 @@ $$ \mu = (\mu_1, \mu_2) \ and\  \sigma^2 = (\sigma^2_1, \sigma^2_2)$$
 Use the Gibbs sampling data augmentation algorithm in **NormalMixtureGibbs.R** (available under Lecture 7 on the course page) to analyze the daily precipitation data. Set the prior hyperparameters suitably. Evaluate the convergence of the sampler.
 
 
+
+```{r}
+# Set the prior hyperparameters suitably
+# Evaluate the convergence of the sampler -> need to save mu??s and sigma??s
+
+##########    BEGIN USER INPUT #################
+# Data options
+rawData <- rainfall
+x <- as.matrix(rainfall$precipitation)
+
+# Model options
+nComp <- 2    # Number of mixture components
+
+# Prior options
+alpha <- 10*rep(1,nComp) # Dirichlet(alpha)
+muPrior <- rep(0,nComp) # Prior mean of mu
+tau2Prior <- rep(10,nComp) # Prior std of mu
+sigma2_0 <- rep(var(x),nComp) # s20 (best guess of sigma2)
+nu0 <- rep(4,nComp) # degrees of freedom for prior on sigma2
+
+# MCMC options
+nIter <- 100 # Number of Gibbs sampling draws
+
+# Plotting options
+# plotFit <- TRUE
+# lineColors <- c("blue", "green", "magenta", 'yellow')
+# sleepTime <- 0.1 # Adding sleep time between iterations for plotting
+################   END USER INPUT ###############
+
+###### Defining a function that simulates from the 
+rScaledInvChi2 <- function(n, df, scale){
+  return((df*scale)/rchisq(n,df=df))
+}
+
+####### Defining a function that simulates from a Dirichlet distribution
+rDirichlet <- function(param){
+  nCat <- length(param)
+  piDraws <- matrix(NA,nCat,1)
+  for (j in 1:nCat){
+    piDraws[j] <- rgamma(1,param[j],1)
+  }
+  piDraws = piDraws/sum(piDraws) # Diving every column of piDraws by the sum of the elements in that column.
+  return(piDraws)
+}
+
+# Simple function that converts between two different representations of the mixture allocation
+S2alloc <- function(S){
+  n <- dim(S)[1]
+  alloc <- rep(0,n)
+  for (i in 1:n){
+    alloc[i] <- which(S[i,] == 1)
+  }
+  return(alloc)
+}
+
+# Initial value for the MCMC
+nObs <- length(x)
+# nObs-by-nComp matrix with component allocations.
+S <- t(rmultinom(nObs, size = 1 , prob = rep(1/nComp,nComp))) 
+mu <- quantile(x, probs = seq(0,1,length = nComp))
+sigma2 <- rep(var(x),nComp)
+probObsInComp <- rep(NA, nComp)
+
+# Setting up the plot
+# xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
+# xGridMin <- min(xGrid)
+# xGridMax <- max(xGrid)
+# mixDensMean <- rep(0,length(xGrid))
+# effIterCount <- 0
+# ylim <- c(0,2*max(hist(x)$density))
+
+# -------------------- Update - start -------------------
+# we want to save mu??s and sigma??s for every interation
+# we have two misxtured model - so two coloums & nIter (100) as rows
+simulated_mu <- matrix(data = NA, nrow = nIter, ncol = 2)
+simulated_sigma <- matrix(data = NA, nrow = nIter, ncol = 2)
+# -------------------- Update - end -------------------
+
+for (k in 1:nIter){
+  # message(paste('Iteration number:',k))
+  # Just a function that converts between different
+  # representations of the group     allocations
+  alloc <- S2alloc(S)  
+  nAlloc <- colSums(S)
+  #print(nAlloc)
+  # Update components probabilities
+  pi <- rDirichlet(alpha + nAlloc)
+  
+  # Update mu's
+  for (j in 1:nComp){
+    precPrior <- 1/tau2Prior[j]
+    precData <- nAlloc[j]/sigma2[j]
+    precPost <- precPrior + precData
+    wPrior <- precPrior/precPost
+    muPost <- wPrior*muPrior + (1-wPrior)*mean(x[alloc == j])
+    tau2Post <- 1/precPost
+    mu[j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
+  }
+  
+  # -------------------- Update - start -------------------
+    simulated_mu[k,] <- mu
+  # -------------------- Update - end -------------------
+  
+  # Update sigma2's
+  for (j in 1:nComp){
+    sigma2[j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], 
+                                scale = (nu0[j]*sigma2_0[j] + 
+                                           sum((x[alloc == j] - mu[j])^2))/(nu0[j] + nAlloc[j]))
+  }
+  
+  # -------------------- Update - start -------------------
+    simulated_sigma[k,] <- sigma2
+  # -------------------- Update - end -------------------
+  
+  
+  
+  # Update allocation
+  for (i in 1:nObs){
+    for (j in 1:nComp){
+      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[j], sd = sqrt(sigma2[j]))
+    }
+    S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
+  }
+  
+  # # Printing the fitted density against data histogram
+  # if (plotFit && (k%%1 ==0)){
+  #   effIterCount <- effIterCount + 1
+  #   hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
+  #   mixDens <- rep(0,length(xGrid))
+  #   components <- c()
+  #   for (j in 1:nComp){
+  #     compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+  #     mixDens <- mixDens + pi[j]*compDens
+  #     lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
+  #     components[j] <- paste("Component ",j)
+  #   }
+  #   mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
+  #   
+  #   lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
+  #   legend("topleft", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
+  #          col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
+  #   Sys.sleep(sleepTime)
+  # }
+  
+}
+
+hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
+lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
+lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
+legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
+
+#########################    Helper functions    ##############################################
+
+```
+
+```{r, warning=FALSE, eval=FALSE}
+# make the plot above with ggplot
+ggplot(data = x) +
+  geom_histogram(aes(x = x))  
+  
+  
+ggplot(data = as.data.frame(x), aes(x = x)) +
+    geom_histogram(aes(y=..density..),
+                 colour="black",
+                 fill="white",
+                 bins=30) +
+  geom_line(aes(x = xGrid, y = mixDensMean))
+  
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+plot_simulated_mu <- ggplot() + 
+  geom_line(aes(x = 1:nIter, y = simulated_mu[,1], color = "mu_1")) +
+  geom_line(aes(x = 1:nIter, y = simulated_mu[,2], color = "mu_2")) +
+  labs(title = "Convergence of simulated mu components", x = "iteration", y = "mu")
+
+plot_simulated_sigma <- ggplot() + 
+  geom_line(aes(x = 1:nIter, y = simulated_sigma[,1], color = "sigma2_1")) +
+  geom_line(aes(x = 1:nIter, y = simulated_sigma[,2], color = "sigma2_2"))+
+  labs(title = "Convergence of simulated sigma components", x = "iteration", y = "simga")
+
+
+grid.arrange(plot_simulated_mu, plot_simulated_sigma, nrow = 2)
+```
+
+
 ## (c) Graphical comparison.
 Let $\hat{\mu}$ denote the posterior mean of the parameter $\mu$ and correspondingly for the other parameters. Plot the following densities in one figure: 1) a histogram or kernel density estimate of the data. 2) Normal density $\mathcal{N} (\hat{\mu},\hat{\sigma}^2)$ in (a). 3) Mixture of normals density $\ p (y_i \mid \hat{\mu},\hat{\sigma}^2, \hat{\pi})$ in (b).
 
 
-#2. Metropolis Random Walk for Poisson regression.
+
+
+
+# 2. Metropolis Random Walk for Poisson regression.
 
 Consider the following Poisson regression model 
 
@@ -60,11 +406,11 @@ where $y_i$ is the count for the ith observation in the sample and $x_i$ is the 
 
 
 ##(a) Obtain the maximum likelihood estimator 
-of $\beta$ in the Poisson regression model for the eBay data [Hint: **glm.R**, don’t forget that **glm()** adds its own intercept so don’t input the covariate Const]. Which covariates are significant?
+of $\beta$ in the Poisson regression model for the eBay data [Hint: **glm.R**, don???t forget that **glm()** adds its own intercept so don???t input the covariate Const]. Which covariates are significant?
 
 
 ## (b) Bayesian analysis of the Poisson regression
-Let’s now do a Bayesian analysis of the Poisson regression. Let the prior be $\beta \sim \mathcal{N}\big[ \mathbf{0},100 \cdot (\mathbf{X}^T \mathbf{X})^{-1} \big]$ where **X** is the $n \times p$ covariate matrix. This is a commonly used prior which is called Zellner’s g-prior. Assume first that the posterior density is approximately multivariate normal:
+Lets now do a Bayesian analysis of the Poisson regression. Let the prior be $\beta \sim \mathcal{N}\big[ \mathbf{0},100 \cdot (\mathbf{X}^T \mathbf{X})^{-1} \big]$ where **X** is the $n \times p$ covariate matrix. This is a commonly used prior which is called Zellner???s g-prior. Assume first that the posterior density is approximately multivariate normal:
 
 $$  \beta \mid y \sim \mathcal{N} \big( \tilde{\beta}, J^{-1}_\mathbf{y} (\tilde{\beta}) \big),  $$
 
@@ -72,7 +418,7 @@ where $\tilde{\beta}$ is the posterior mode and $J_\mathbf{y}  (\tilde{\beta})$ 
 
 
 ## (c) Simulate from the actual posterior
-Now, let’s simulate from the actual posterior of $\beta$ using the Metropolis algo- rithm and compare with the approximate results in b). Program a general function that uses the Metropolis algorithm to generate random draws from an *arbitrary* posterior density. In order to show that it is a general function for any model, I will denote the vector of model parameters by $\theta$. Let the proposal density be the multivariate normal density mentioned in Lecture 8 (random walk Metropolis):
+Now, let???s simulate from the actual posterior of $\beta$ using the Metropolis algo- rithm and compare with the approximate results in b). Program a general function that uses the Metropolis algorithm to generate random draws from an *arbitrary* posterior density. In order to show that it is a general function for any model, I will denote the vector of model parameters by $\theta$. Let the proposal density be the multivariate normal density mentioned in Lecture 8 (random walk Metropolis):
 
 $$  \theta_p \mid \theta^{i-1} \sim \mathcal{N} \big(\theta^{i-1}, c \cdot \small\sum \big),  $$
 
@@ -80,6 +426,144 @@ where $\sum = J^{-1}_\mathbf{y}  (\tilde{\beta})$ obtained in b). The value c is
 should be an input to your Metropolis function. The user of your Metropo- lis function should be able to supply her own posterior density function, not necessarily for the Poisson regression, and still be able to use your Metropolis function. This is not so straightforward, unless you have come across *function objects* in **R** and the triple dot (...) wildcard argument. I have posted a note (HowToCodeRWM.pdf) on the course web page that describes how to do this in R. Now, use your new Metropolis function to sample from the posterior of $\beta$ in the Poisson regression for the eBay dataset. Assess MCMC convergence by graphical methods.
 
 
+
+# Lecture code
+```{r, eval=FALSE}
+# the given R file - NormalMixtureGibbs.R
+
+# Estimating a simple mixture of normals
+# Author: Mattias Villani, IDA, Linkoping University. http://mattiasvillani.com
+
+##########    BEGIN USER INPUT #################
+# Data options
+data(faithful)
+rawData <- faithful
+x <- as.matrix(rawData['eruptions'])
+
+# Model options
+nComp <- 4    # Number of mixture components
+
+# Prior options
+alpha <- 10*rep(1,nComp) # Dirichlet(alpha)
+muPrior <- rep(0,nComp) # Prior mean of mu
+tau2Prior <- rep(10,nComp) # Prior std of mu
+sigma2_0 <- rep(var(x),nComp) # s20 (best guess of sigma2)
+nu0 <- rep(4,nComp) # degrees of freedom for prior on sigma2
+
+# MCMC options
+nIter <- 1000 # Number of Gibbs sampling draws
+
+# Plotting options
+plotFit <- TRUE
+lineColors <- c("blue", "green", "magenta", 'yellow')
+sleepTime <- 0.1 # Adding sleep time between iterations for plotting
+################   END USER INPUT ###############
+
+###### Defining a function that simulates from the 
+rScaledInvChi2 <- function(n, df, scale){
+  return((df*scale)/rchisq(n,df=df))
+}
+
+####### Defining a function that simulates from a Dirichlet distribution
+rDirichlet <- function(param){
+  nCat <- length(param)
+  piDraws <- matrix(NA,nCat,1)
+  for (j in 1:nCat){
+    piDraws[j] <- rgamma(1,param[j],1)
+  }
+  piDraws = piDraws/sum(piDraws) # Diving every column of piDraws by the sum of the elements in that column.
+  return(piDraws)
+}
+
+# Simple function that converts between two different representations of the mixture allocation
+S2alloc <- function(S){
+  n <- dim(S)[1]
+  alloc <- rep(0,n)
+  for (i in 1:n){
+    alloc[i] <- which(S[i,] == 1)
+  }
+  return(alloc)
+}
+
+# Initial value for the MCMC
+nObs <- length(x)
+S <- t(rmultinom(nObs, size = 1 , prob = rep(1/nComp,nComp))) # nObs-by-nComp matrix with component allocations.
+mu <- quantile(x, probs = seq(0,1,length = nComp))
+sigma2 <- rep(var(x),nComp)
+probObsInComp <- rep(NA, nComp)
+
+# Setting up the plot
+xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
+xGridMin <- min(xGrid)
+xGridMax <- max(xGrid)
+mixDensMean <- rep(0,length(xGrid))
+effIterCount <- 0
+ylim <- c(0,2*max(hist(x)$density))
+
+
+for (k in 1:nIter){
+  message(paste('Iteration number:',k))
+  alloc <- S2alloc(S) # Just a function that converts between different representations of the group allocations
+  nAlloc <- colSums(S)
+  print(nAlloc)
+  # Update components probabilities
+  pi <- rDirichlet(alpha + nAlloc)
+  
+  # Update mu's
+  for (j in 1:nComp){
+    precPrior <- 1/tau2Prior[j]
+    precData <- nAlloc[j]/sigma2[j]
+    precPost <- precPrior + precData
+    wPrior <- precPrior/precPost
+    muPost <- wPrior*muPrior + (1-wPrior)*mean(x[alloc == j])
+    tau2Post <- 1/precPost
+    mu[j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
+  }
+  
+  # Update sigma2's
+  for (j in 1:nComp){
+    sigma2[j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], scale = (nu0[j]*sigma2_0[j] + sum((x[alloc == j] - mu[j])^2))/(nu0[j] + nAlloc[j]))
+  }
+  
+  # Update allocation
+  for (i in 1:nObs){
+    for (j in 1:nComp){
+      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[j], sd = sqrt(sigma2[j]))
+    }
+    S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
+  }
+  
+  # Printing the fitted density against data histogram
+  if (plotFit && (k%%1 ==0)){
+    effIterCount <- effIterCount + 1
+    hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
+    mixDens <- rep(0,length(xGrid))
+    components <- c()
+    for (j in 1:nComp){
+      compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+      mixDens <- mixDens + pi[j]*compDens
+      lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
+      components[j] <- paste("Component ",j)
+    }
+    mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
+    
+    lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
+    legend("topleft", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
+           col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
+    Sys.sleep(sleepTime)
+  }
+  
+}
+
+hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
+lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
+lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
+legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
+
+#########################    Helper functions    ##############################################
+
+
+```
 
 \newpage
 # Appendix
