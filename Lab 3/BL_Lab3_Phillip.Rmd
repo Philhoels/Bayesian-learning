@@ -51,9 +51,9 @@ set.seed(123456)
 # v_0 tells us how much we trust the prior
 v_0 <- 1 ###########------------------------------- ?
 #sigma2_0 <- 1 ###########------------------------------- ? 
-sigma2_0 <- var(rainfall$precipitation) # the variacne of the data or #Var(x_bar) = sigma^2/n
+sigma2_0 <- var(rainfall$precipitation) # the variacne of the data 
 # sigma
-sigma2 <- rinvchisq(n = 1, df = v_0, scale = sigma2_0)
+sigma2 <- rinvchisq(n = 1, df = v_0, scale = sigma2_0) # need this value for the first simulation
 
 # prior parameter for mu
 # initialized values - decided by my own
@@ -61,14 +61,14 @@ tau2_0 <- 1 ###########------------------------------- ?
 #tau2_0 <- sigma2_0
 mu_0 <- mean(rainfall$precipitation)
 # mu
-mu <- rnorm(n = 1, mean = mu_0, tau2_0)
+mu <- rnorm(n = 1, mean = mu_0, tau2_0) # need this value for the first simulation
 
 # the sampling
 nDraws <- 1000
 Gibbs_sampling <- data.frame("mu" = numeric(),
                              "sigma2" = numeric())
 
-# for exercise 1aii
+# for exercise 1 a) ii
 # create vairables for mean and varaicne
 mean_vec <- vector(mode = "numeric", length = nDraws)
 variance_vec <- vector(mode = "numeric", length = nDraws)
@@ -78,6 +78,7 @@ for (i in 1:nDraws) {
   # generate mu - need mu_n (need w to generate mu_n) & tau2_n
   # mu_n - L2S3 - Normal data, known variance - normal prior
   
+  #-- generate mu ------------ start
   # generate w
   w <- (n/sigma2)/((n/sigma2) + (1/tau2_0))
   # generate mu_n
@@ -88,8 +89,10 @@ for (i in 1:nDraws) {
   
   #-- generate mu 
   mu <- rnorm(n = 1, mean = mu_n, sd = tau2_n)
+  #-- generate mu ------------ end
   
-  # generate sigma2 
+  
+  # generate sigma2 ------------ start
   # generate v_n - L53 - Normal model with normal prior
   v_n = v_0 + n
   
@@ -98,6 +101,7 @@ for (i in 1:nDraws) {
   
   #-- generate sigma2
   sigma2 <- rinvchisq(n = 1, df = v_n, scale = second_term)
+  # generate sigma2 ------------ end
   
   # save mu & sigma in df
   sampling <- data.frame("mu" = mu,
@@ -105,7 +109,7 @@ for (i in 1:nDraws) {
   
   # variables we want to save
   Gibbs_sampling <- rbind(Gibbs_sampling, sampling)
-  #save the mean and variance
+  #save the mean of mu and variance
   mean_vec[i] <- mean(Gibbs_sampling$mu)
   variance_vec[i] <- var(Gibbs_sampling$sigma2)
   
@@ -132,25 +136,34 @@ grid.arrange(plot_tace_mu, plot_tace_sigma2, nrow = 2)
 
 ```
 
+In the first picture you can see the course of $\mu$, which converges very quickly. The starting value is about 22, but after a few iterations it approaches the value of 26-27.
+It seems that sigma does not have a start value that is extremely outside the normal range. So there is no burn-in period.
+
+
 
 ```{r, warning=FALSE, echo=FALSE}
 # converge of mean 
 plot_converge_mu <- ggplot() + 
   geom_line(aes(x = Gibbs_sampling$iterations, y = mean_vec, color = "mean")) + 
-  labs(title = "Convergence of mean", x = "interation", y = "mean")
+  labs(title = "Convergence of mu", x = "interation", y = "mean")
 
 # converge of sigma 
 plot_converge_sigma <-ggplot() + 
   geom_line(aes(x = Gibbs_sampling$iterations, y = variance_vec, color = "variance")) + 
-  labs(title = "Convergence of variance", x = "interation", y = "variance")
+  labs(title = "Convergence of sigma2", x = "interation", y = "variance")
 
 grid.arrange(plot_converge_mu, plot_converge_sigma, nrow = 2)
 ```
 
+We have calculated the mean and the variance of the given iteration. This can be seen at the end of the code of the task 1a)i of the Gibbs sampler. 
+The first picture confirms the assumption that mu converges after only a few iterations. 
+The same is true for sigma, but here about 125 iterations are used. 
 
 
+```{r, echo=FALSE, eval=FALSE}
 
-```{r, echo=FALSE}
+### Don??t plot this part! 
+
 # plotting the trajectories
 # plot data
 plot_data_q1aii <- Gibbs_sampling[,1:2]
@@ -169,7 +182,10 @@ plot_mu_vs_sigma_dot
 
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, eval=FALSE}
+
+### Don??t plot this part! 
+
 plot_mu_vs_sigma_line <- ggplot(plot_data_q1aii, aes(x = plot_data_q1aii$mu, y = plot_data_q1aii$sigma2)) + geom_path(aes(color = "Markov chains")) + 
   geom_point(aes(x = plot_data_q1aii$mu[1], y = plot_data_q1aii$sigma2[1], color = "start"), size = 3) +
   geom_point(aes(x = plot_data_q1aii$mu[length(plot_data_q1aii$mu)], 
@@ -192,11 +208,13 @@ $$ \mu = (\mu_1, \mu_2) \ and\  \sigma^2 = (\sigma^2_1, \sigma^2_2)$$
 
 Use the Gibbs sampling data augmentation algorithm in **NormalMixtureGibbs.R** (available under Lecture 7 on the course page) to analyze the daily precipitation data. Set the prior hyperparameters suitably. Evaluate the convergence of the sampler.
 
-
+The following code from lecture 7, this one has been adapted and modified for the following tasks.
 
 ```{r}
 # Set the prior hyperparameters suitably
 # Evaluate the convergence of the sampler -> need to save mu??s and sigma??s
+
+# I m
 
 ##########    BEGIN USER INPUT #################
 # Data options
