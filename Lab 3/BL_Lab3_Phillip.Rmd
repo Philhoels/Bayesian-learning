@@ -11,13 +11,22 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, echo=FALSE, warning=FALSE}
-# library used
+```{r echo=FALSE, warning=FALSE, results='hide', message=FALSE}
+# library used 
 library(ggplot2)
 library(MASS) # To access the mvrnorm() function
 library(LaplacesDemon) # for rinvchisq
 library(gridExtra) # put plot together
+library(mvtnorm)
+library(knitr)
+#install.packages("kableExtra")
+library(kableExtra)
+#install.packages('latex2exp')
+library(latex2exp)
+library(dplyr)
 ```
+
+\newpage
 
 
 # 1. Normal model, mixture of normal model with semi-conjugate prior.
@@ -126,11 +135,11 @@ Gibbs_sampling$iterations <- 1:nDraws
 # plot mu
 plot_tace_mu <- ggplot(data = Gibbs_sampling) + 
   geom_line(aes(x = iterations, y = mu, color = "mu")) + 
-  ggtitle("Tace of mu")
+  ggtitle(TeX("Tace of $\\mu$"))
   # plot sigma2
 plot_tace_sigma2 <-ggplot(data = Gibbs_sampling) + 
   geom_line(aes(x = iterations, y = sigma2, color = "sigma2")) + 
-  ggtitle("Tace of sigma2")
+  ggtitle(TeX("Tace of $\\sigma^2$"))
 
 grid.arrange(plot_tace_mu, plot_tace_sigma2, nrow = 2)
 
@@ -145,12 +154,12 @@ It seems that sigma does not have a start value that is extremely outside the no
 # converge of mean 
 plot_converge_mu <- ggplot() + 
   geom_line(aes(x = Gibbs_sampling$iterations, y = mean_vec, color = "mean")) + 
-  labs(title = "Convergence of mu", x = "interation", y = "mean")
+  labs(title = TeX("Convergence of $\\mu$"), x = "interation", y = "mean")
 
 # converge of sigma 
 plot_converge_sigma <-ggplot() + 
   geom_line(aes(x = Gibbs_sampling$iterations, y = variance_vec, color = "variance")) + 
-  labs(title = "Convergence of sigma2", x = "interation", y = "variance")
+  labs(title = TeX("Convergence of $\\sigma^2$"), x = "interation", y = "variance")
 
 grid.arrange(plot_converge_mu, plot_converge_sigma, nrow = 2)
 ```
@@ -361,7 +370,7 @@ for (k in 1:nIter){
 
 ```
 
-```{r, warning=FALSE, eval=FALSE}
+```{r, warning=FALSE, eval=FALSE, echo=FALSE}
 # make the plot above with ggplot
 ggplot(data = as.data.frame(x)) +
   geom_histogram(aes(x = x))  
@@ -384,12 +393,12 @@ ggplot(data = as.data.frame(x), aes(x = x)) +
 plot_simulated_mu <- ggplot() + 
   geom_line(aes(x = 1:nIter, y = simulated_mu[,1], color = "mu_1")) +
   geom_line(aes(x = 1:nIter, y = simulated_mu[,2], color = "mu_2")) +
-  labs(title = "Convergence of simulated mu components", x = "iteration", y = "mu")
+  labs(title = TeX("Convergence of simulated $\\mu$ components"), x = "iteration", y = "mu")
 
 plot_simulated_sigma <- ggplot() + 
   geom_line(aes(x = 1:nIter, y = simulated_sigma[,1], color = "sigma2_1")) +
   geom_line(aes(x = 1:nIter, y = simulated_sigma[,2], color = "sigma2_2"))+
-  labs(title = "Convergence of simulated sigma components", x = "iteration", y = "simga")
+  labs(title = TeX("Convergence of simulated $\\sigma$ components"), x = "iteration", y = "simga")
 
 
 grid.arrange(plot_simulated_mu, plot_simulated_sigma, nrow = 2)
@@ -399,7 +408,9 @@ grid.arrange(plot_simulated_mu, plot_simulated_sigma, nrow = 2)
 ## (c) Graphical comparison.
 Let $\hat{\mu}$ denote the posterior mean of the parameter $\mu$ and correspondingly for the other parameters. Plot the following densities in one figure: 
 
+
 1) a histogram or kernel density estimate of the data. 
+
 ```{r, echo=FALSE}
 ggplot(data = rainfall, aes(x = precipitation)) + 
   geom_histogram(aes(y=..density..),
@@ -410,6 +421,7 @@ ggplot(data = rainfall, aes(x = precipitation)) +
 
 
 2) Normal density $\mathcal{N} (\hat{\mu},\hat{\sigma}^2)$ in (a). 
+
 ```{r, echo=FALSE}
 
 # \hat{mu} & \hat{sigma}^2 - simulated with rnomal with this values
@@ -445,6 +457,7 @@ ggplot(data = as.data.frame(plot_data_q1c2), aes(x = plot_data_q1c2)) +
 
 
 3) Mixture of normals density $\ p (y_i \mid \hat{\mu},\hat{\sigma}^2, \hat{\pi})$ in (b).
+
 ```{r, echo=FALSE}
 hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
 lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
@@ -474,7 +487,52 @@ where $y_i$ is the count for the ith observation in the sample and $x_i$ is the 
 
 
 ##(a) Obtain the maximum likelihood estimator 
-of $\beta$ in the Poisson regression model for the eBay data [Hint: **glm.R**, don???t forget that **glm()** adds its own intercept so don???t input the covariate Const]. Which covariates are significant?
+of $\beta$ in the Poisson regression model for the eBay data [Hint: **glm.R**, do nott forget that **glm()** adds its own intercept so do nott input the covariate Const]. Which covariates are significant?
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# clean environment
+rm(list = ls())
+```
+
+```{r, echo=FALSE}
+### -------------- Lab 3 ### --------------  ###
+
+### --------------  a)
+
+# load and prep data
+data <- read.table("eBayNumberOfBidderData.dat", header = TRUE)
+
+y <- data$nBids
+n <- nrow(data)
+# for the R glm function, we do not need a intercept in the data - glm does create it??s own
+data_noIntercept <- data[,-2]
+colnames_vec <- colnames(data_noIntercept)
+```
+
+The output of the poisson regression model:
+```{r, echo=FALSE}
+# Poisson regression model
+
+Poisson_rm <- glm(formula = nBids ~ .,
+                  data = data_noIntercept,
+                  family = poisson)
+summary(Poisson_rm)
+
+```
+
+Above do we see the output of the fitted Poisson regression model. The exercises are to find covariates which are significant. This doe we observe at the Coefficients table. The p-values which do have three starts next to it are statistically significant. This is the case for **VerifyID, Sealed, LogBook, MinBidShare**. This variables have the highest influence of the number of bets (response variable).
+
+Coefficients values:
+```{r,echo=FALSE}
+
+# transform data into data frame
+coefficnets_2a <- t(as.data.frame(Poisson_rm$coefficients))
+rownames(coefficnets_2a) <- "Values"
+
+kable(coefficnets_2a) %>% 
+  kable_styling(latex_options="scale_down")
+
+```
 
 
 ## (b) Bayesian analysis of the Poisson regression
@@ -484,15 +542,91 @@ $$  \beta \mid y \sim \mathcal{N} \big( \tilde{\beta}, J^{-1}_\mathbf{y} (\tilde
 
 where $\tilde{\beta}$ is the posterior mode and $J_\mathbf{y}  (\tilde{\beta})$ is the negative Hessian at the posterior mode. $\tilde{\beta}$ and $J_\mathbf{y}  (\tilde{\beta})$ can be obtained by numerical optimization (**optim.R**) exactly like you already did for the logistic regression in Lab 2 (but with the log posterior function replaced by the corresponding one for the Poisson model, which you have to code up.).
 
+```{r, echo=FALSE}
+#### ----------------- b)
+# Setting up the prior
+# Zellner's g-prior
+X = as.matrix(data[,-1])
+mu = rep(0, times = ncol(X)) # need to be a vector
+Sigma = 100 * (solve(t(X) %*% X)) # Covariance matrix
+
+# Zellner's g-prior for \beta is a multivariate normal distribution with covariance matrix proportional to the inverse Fisher information matrix for \beta 
+#?mvrnorm() #sigma => covariance matrix
+
+beta <- mvrnorm(n =1, mu = mu, Sigma = Sigma)
+
+```
+
+
+```{r, echo=FALSE}
+# generate \hat{\beta} and J_y(\hat{\beta}) - optim
+
+# Defining the functions that returns the log posterior (Logistic and Probit models). Note that the first input argument of
+
+# this function must be the one that we optimize on, i.e. the regression coefficients.
+
+# Poisson regression model
+LogPostPoisson = function(beta,y,X){
+  nPara <- length(beta)
+  #linPred <- X%*%betaVect;
+  
+  # evaluating the log-likelihood                                    
+  logLik <- sum(y * (X %*% beta)  - exp(X %*% beta))
+  
+  # evaluating the prior
+  logPrior <- dmvnorm(beta, matrix(0,nPara,1), Sigma, log=TRUE)
+  if (abs(logLik) == Inf) logLik = -20000 
+  # Likelihood is not finite, stear the optimizer away from here!
+  
+  
+  # add the log prior and log-likelihood together to get log posterior
+  return(logLik + logPrior)
+}
+
+
+# Different starting values. Ideally, any random starting value gives you the same optimum (i.e. optimum is unique)
+initVal <- as.vector(rep(0,dim(X)[2]))
+
+
+OptimResults<-optim(initVal,
+                    LogPostPoisson,
+                    gr=NULL,
+                    y,X,
+                    method=c("BFGS"),
+                    control=list(fnscale=-1),
+                    hessian=TRUE) 
+# hessian=TRUE -> output includes hessian matrix
+
+# Posterior mode & the negative Hessian at the posterior mode
+postMode <- OptimResults$par
+postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(Hessian)
+
+```
+
+Posterior mode - Coefficients values:
+```{r, echo=FALSE}
+postMode <- t(as.data.frame(postMode, row.names = c("(Intercept)", colnames_vec[-1])))
+rownames(postMode) <- "Values"
+kable(postMode) %>% 
+  kable_styling(latex_options="scale_down")
+```
 
 ## (c) Simulate from the actual posterior
-Now, let???s simulate from the actual posterior of $\beta$ using the Metropolis algo- rithm and compare with the approximate results in b). Program a general function that uses the Metropolis algorithm to generate random draws from an *arbitrary* posterior density. In order to show that it is a general function for any model, I will denote the vector of model parameters by $\theta$. Let the proposal density be the multivariate normal density mentioned in Lecture 8 (random walk Metropolis):
+Now, lets simulate from the actual posterior of $\beta$ using the Metropolis algorithm and compare with the approximate results in b). Program a general function that uses the Metropolis algorithm to generate random draws from an *arbitrary* posterior density. In order to show that it is a general function for any model, I will denote the vector of model parameters by $\theta$. Let the proposal density be the multivariate normal density mentioned in Lecture 8 (random walk Metropolis):
 
 $$  \theta_p \mid \theta^{i-1} \sim \mathcal{N} \big(\theta^{i-1}, c \cdot \small\sum \big),  $$
 
 where $\sum = J^{-1}_\mathbf{y}  (\tilde{\beta})$ obtained in b). The value c is a tuning parameter and y
 should be an input to your Metropolis function. The user of your Metropo- lis function should be able to supply her own posterior density function, not necessarily for the Poisson regression, and still be able to use your Metropolis function. This is not so straightforward, unless you have come across *function objects* in **R** and the triple dot (...) wildcard argument. I have posted a note (HowToCodeRWM.pdf) on the course web page that describes how to do this in R. Now, use your new Metropolis function to sample from the posterior of $\beta$ in the Poisson regression for the eBay dataset. Assess MCMC convergence by graphical methods.
 
+
+```{r}
+# Metropolis-Hastings
+
+RWMSampler = function(x){
+  
+}
+```
 
 
 # Lecture code
