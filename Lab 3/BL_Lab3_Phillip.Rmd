@@ -91,7 +91,7 @@ for (i in 1:nDraws) {
   # generate w
   w <- (n/sigma2)/((n/sigma2) + (1/tau2_0))
   # generate mu_n
-  mu_n <- w * mean(rainfall$precipitation) + (1 - w)
+  mu_n <- w * mean(rainfall$precipitation) + (1 - w) * mu_0
   
   # genearte tau2_n
   tau2_n <- 1 / (n/sigma2 + 1/tau2_0)
@@ -106,7 +106,7 @@ for (i in 1:nDraws) {
   v_n = v_0 + n
   
   # generate second term - to sample sigma2
-  second_term <- (v_0 + sigma2 + sum((rainfall$precipitation - mu)^2))/ (n + v_0)
+  second_term <- (v_0 * sigma2 + sum((rainfall$precipitation - mu)^2))/ (n + v_0)
   
   #-- generate sigma2
   sigma2 <- rinvchisq(n = 1, df = v_n, scale = second_term)
