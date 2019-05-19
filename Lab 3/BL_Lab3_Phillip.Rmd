@@ -58,15 +58,15 @@ set.seed(123456)
 # prior parameter for sigma
 # initialized values - decided by my own
 # v_0 tells us how much we trust the prior
-v_0 <- 1 ###########------------------------------- ?
-#sigma2_0 <- 1 ###########------------------------------- ? 
+v_0 <- 1 
+
 sigma2_0 <- var(rainfall$precipitation) # the variacne of the data 
 # sigma
 sigma2 <- rinvchisq(n = 1, df = v_0, scale = sigma2_0) # need this value for the first simulation
 
 # prior parameter for mu
 # initialized values - decided by my own
-tau2_0 <- 1 ###########------------------------------- ?
+tau2_0 <- 1 
 #tau2_0 <- sigma2_0
 mu_0 <- mean(rainfall$precipitation)
 # mu
@@ -219,7 +219,7 @@ Use the Gibbs sampling data augmentation algorithm in **NormalMixtureGibbs.R** (
 
 The following code from lecture 7, this one has been adapted and modified for the following tasks.
 
-```{r}
+```{r, echo=FALSE}
 # Set the prior hyperparameters suitably
 # Evaluate the convergence of the sampler -> need to save mu??s and sigma??s
 
@@ -489,7 +489,7 @@ where $y_i$ is the count for the ith observation in the sample and $x_i$ is the 
 ##(a) Obtain the maximum likelihood estimator 
 of $\beta$ in the Poisson regression model for the eBay data [Hint: **glm.R**, do nott forget that **glm()** adds its own intercept so do nott input the covariate Const]. Which covariates are significant?
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
 # clean environment
 rm(list = ls())
 ```
@@ -527,7 +527,6 @@ Coefficients values:
 
 # transform data into data frame
 coefficnets_2a <- t(as.data.frame(Poisson_rm$coefficients))
-rownames(coefficnets_2a) <- "Values"
 
 kable(coefficnets_2a) %>% 
   kable_styling(latex_options="scale_down")
@@ -605,11 +604,13 @@ postCov <- -solve(OptimResults$hessian) # Posterior covariance matrix is -inv(He
 
 Posterior mode - Coefficients values:
 ```{r, echo=FALSE}
-postMode <- t(as.data.frame(postMode, row.names = c("(Intercept)", colnames_vec[-1])))
-rownames(postMode) <- "Values"
-kable(postMode) %>% 
+postMode_df <- t(as.data.frame(postMode, row.names = c("(Intercept)", colnames_vec[-1])))
+#rownames(postMode) <- "Values"
+kable(postMode_df) %>% 
   kable_styling(latex_options="scale_down")
 ```
+
+As we can see does the result of the coefficient estimation looks like in the exercise of 2a). 
 
 ## (c) Simulate from the actual posterior
 Now, lets simulate from the actual posterior of $\beta$ using the Metropolis algorithm and compare with the approximate results in b). Program a general function that uses the Metropolis algorithm to generate random draws from an *arbitrary* posterior density. In order to show that it is a general function for any model, I will denote the vector of model parameters by $\theta$. Let the proposal density be the multivariate normal density mentioned in Lecture 8 (random walk Metropolis):
@@ -621,11 +622,186 @@ should be an input to your Metropolis function. The user of your Metropo- lis fu
 
 
 ```{r}
+
+### Version 2
+
 # Metropolis-Hastings
 
-RWMSampler = function(x){
+
+# Random walk Metropolis algorithm - L8S7
+RWMSampler = function(logPostFunc, theta0, c, Sigma, n_iter, ...){
+  # Input:
+  # LogPostFunc - any posterior distribution
+  # Sigma - negative Hessian at the posterior mode. (calculated in b))
+  # c - tunning parameter
   
+  # init vlaues
+  accept <- 0
+  reject <- 0
+  
+  
+  # Initialize theta^(0)
+  # Initialize matrix to save the result
+  theta_output <- matrix(data = 0, nrow = n_iter, ncol = length(postMode))
+  thetha_i_1 <- theta0
+  
+  # given proposal density
+  theta_c = mvrnorm(n =1, mu = thetha_i_1, Sigma = c * Sigma) # current theta
+  
+  # setp 1 - sample proposal distribution
+  
+  for (i in 1:n_iter) {
+    # given proposal density
+    theta_p <- mvrnorm(n = 1, mu = theta_c, Sigma = c * Sigma)
+    
+    # setp 2 - compute acceptance probability
+    
+    # calculate the ratio
+    # p(thetha_p|y) / p(theta^(i-1)|y)
+    p_theta_p <- logPostFunc(theta_p, ...)
+    p_theta_i_1 <- logPostFunc(theta_c, ...)
+    ratio <- exp(p_theta_p - p_theta_i_1)
+    
+    # find alpha
+    alpha <- min(c(1, ratio))
+    
+    # setp 3 - set theta^(i) = theta_p and theta^(i) = theta^(i-1)
+    
+    U = runif(1)
+    if(U < alpha){
+      theta_c <- theta_p
+      accept = accept + 1
+    } else{
+      reject = reject + 1
+    }
+    
+    # save vakue
+    theta_output[i,] <- theta_c
+      
+    }
+    
+    # return results
+    result_list <- list("theta" = theta_output,
+                        "accept" = accept,
+                        "reject" = reject,
+                        "accep_prob" = accept/reject)
+
 }
+
+
+```
+
+```{r}
+# run random walk
+RandomWalk_Metropolis <- RWMSampler(logPostFunc = LogPostPoisson, 
+                                    theta = postMode,
+                                    c = 1,
+                                    Sigma = postCov,
+                                    n_iter=10000,
+                                    y=y, X=X)
+
+```
+
+Coefficients values - Random Walk Metropolis:
+```{r, echo=FALSE}
+# create data frame output
+rw_Coefficients <-as.data.frame(RandomWalk_Metropolis$theta)
+colnames(rw_Coefficients) <- c("(Intercept)", colnames_vec[-1])
+rw_Coefficients$iter <- 1:nrow(rw_Coefficients)
+rw_Coefficients_mean <- colMeans(rw_Coefficients[-10])
+#rownames(rw_Coefficients_mean) <- "Values"
+#kable(rw_Coefficients_mean) %>% 
+#  kable_styling(latex_options="scale_down")
+kable(t(rw_Coefficients_mean)) %>% 
+  kable_styling(latex_options="scale_down")
+```
+
+
+```{r, echo=FALSE}
+#plot of the coefficients
+plot_list <- list()
+plot_data2c <- rw_Coefficients[-10]
+for (i in 1:ncol(rw_Coefficients[-10])) { # -10 because we want to remove the iter coloumn
+  colname <- colnames(plot_data2c)[i]
+  
+  plot <- ggplot(plot_data2c, aes(x = 1:nrow(plot_data2c),y = plot_data2c[,i])) +
+    geom_line() +
+    ggtitle(paste(colname)) + ylab(paste(colname)) + xlab("x")
+  
+  plot_list[[i]] = plot
+}
+
+```
+
+Plot of all the coefficients:
+```{r, echo=FALSE}
+  plot <- ggplot(plot_data2c, aes(x = 1:nrow(plot_data2c))) +
+  ggtitle("beta") + ylab("values") + xlab("iteration") +
+  geom_line(aes(y = plot_data2c[,1], color = "(Intercept)")) + 
+  geom_line(aes(y = plot_data2c[,2], color = "PowerSeller")) + 
+  geom_line(aes(y = plot_data2c[,3], color = "VerifyID")) + 
+  geom_line(aes(y = plot_data2c[,4], color = "Sealed" )) + 
+  geom_line(aes(y = plot_data2c[,5], color = "Minblem" )) + 
+  geom_line(aes(y = plot_data2c[,6], color = "MajBlem")) + 
+  geom_line(aes(y = plot_data2c[,7], color = "LargNeg")) +
+  geom_line(aes(y = plot_data2c[,8], color = "LogBook")) +
+  geom_line(aes(y = plot_data2c[,9], color = "MinBidShare")) +
+  theme(legend.position = "bottom") +
+  scale_fill_discrete(name = "Coefficients")
+
+plot
+```
+
+
+```{r, echo=FALSE, eval=FALSE}
+grid.arrange(plot_list[[1]],plot_list[[2]],plot_list[[3]],
+             plot_list[[3]],plot_list[[4]],plot_list[[5]],
+             plot_list[[6]],plot_list[[7]],plot_list[[9]],
+             ncol = 3, nrow = 3)
+```
+
+
+
+```{r, echo=FALSE}
+grid.arrange(plot_list[[1]],plot_list[[2]],plot_list[[3]],
+             ncol = 1, nrow = 3)
+
+```
+
+```{r, echo=FALSE}
+grid.arrange(plot_list[[3]],plot_list[[4]],plot_list[[5]],
+             ncol = 1, nrow = 3)
+```
+
+```{r, echo=FALSE}
+grid.arrange(plot_list[[6]],plot_list[[7]],plot_list[[9]],
+             ncol = 1, nrow = 3)
+```
+
+# Example code 
+```{r, echo=FALSE, eval=FALSE}
+# ------------- illustrate
+# How code up the Random Walk Metropolis Algorithm in R
+
+# This is the log posterior density of the beta(s+a,f+b) density
+LogPostBernBeta <- function(theta, s, f, a, b){
+logPost <- (s+a-1)*log(theta) + (f+b-1)*log(1-theta)
+return(logPost)
+}
+# Testing if the log posterior function works
+s <- 8;f <- 2;a <- 1;b <- 1
+logPost <- LogPostBernBeta(theta = 0.1, s, f, a, b)
+print(logPost)
+# This is a rather useless function that takes the function myFunction,
+# evaluates it at x = 0.3, and then returns two times the function value.
+MultiplyByTwo <- function(myFunction, ...){
+x <- 0.3
+y <- myFunction(x,...)
+return(2*y)
+}
+#Let???s try if the MultiplyByTwo function works:
+MultiplyByTwo(LogPostBernBeta,s,f,a,b)
+
 ```
 
 
