@@ -76,6 +76,8 @@ simulated AR(1)-process. Are you able to estimate the true values?
  - ii. For each of the two data sets, evaluate the convergence of the samplers
 and plot the joint posterior of $\mu$ and $\phi$. Comments?
 
+We assume $\mu\sim \mathcal N (0,100)$ and $\sigma^2\sim Inv\  \chi^2(100, 2)$$
+
 ```{r echo=FALSE}
 set.seed(1111)
 
@@ -94,8 +96,11 @@ parameters {
   real<lower=-1, upper=1> phi;
 }
 model {
+  \\ prior
   mu ~ normal(0,100);
-  sigma2 ~ scaled_inv_chi_square(100,1);
+  sigma2 ~ scaled_inv_chi_square(100,2);
+  
+  \\ model
   x[2:N] ~ normal( mu + phi*(x[1:(N-1)]-mu), sqrt(sigma2));
 }'
 
