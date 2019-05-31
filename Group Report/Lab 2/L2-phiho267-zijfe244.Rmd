@@ -470,7 +470,6 @@ print(postMode)
 ```
 
 ```{r, echo=FALSE}
-
 print('The approximate posterior standard deviation is:')
 print(approxPostStd)
 ```
@@ -720,6 +719,10 @@ sigmoid_function = function(x){
 sigmoid_function(example)
 ```
 
+```{r}
+hist(sigmoid$job_flag_binary,2)
+```
+
 ```{r, echo=FALSE, warning=FALSE}
 ggplot(data = sigmoid, aes(x = Probability)) + 
   geom_histogram(aes(y = ..density..),
@@ -755,7 +758,6 @@ ggplot(data = sigmoid, aes(x = sigmoid$Probability, y = sigmoid$job_flag_binary)
 
 
 ```{r, echo=FALSE}
-
 ggplot(pred.hist, aes(x=V1)) +
   geom_density(alpha = .2, fill = "#FF6666") +
   xlab("NSmallChild") + ggtitle("Density and credible interval of the feature NSmallChild ") +
